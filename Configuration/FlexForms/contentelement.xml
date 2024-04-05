@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<T3DataStructure>
+    <sheets>
+        <sDEF>
+            <ROOT>
+                <TCEforms>
+                    <sheetTitle>Content element settings</sheetTitle>
+                </TCEforms>
+                <type>array</type>
+                <el>
+                    <settings.templateFile>
+                        <TCEforms>
+                            <label>Main template file</label>
+                            <config>
+                                <type>file</type>
+                                <maxitems>1</maxitems>
+                                <allowed>html</allowed>
+                            </config>
+                        </TCEforms>
+                    </settings.templateFile>
+                    <settings.variables>
+                        <TCEforms>
+                            <label>Variables as json object</label>
+                            <config>
+                                <type>json</type>
+                            </config>
+                        </TCEforms>
+                    </settings.variables>
+                </el>
+            </ROOT>
+        </sDEF>
+    </sheets>
+</T3DataStructure>

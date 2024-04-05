@@ -1,0 +1,17 @@
+mod.wizards.newContentElement.wizardItems {
+  Development {
+    header = Development
+    elements {
+      hddevelopment_contentelement {
+        title = Development: Content Element
+        description = Frontend file for developing a new content element
+        tt_content_defValues {
+          CType = list
+          list_type =hddevelopment_contentelement
+        }
+      }
+    }
+
+    show := addToList(hddevelopment_contentelement)
+  }
+}

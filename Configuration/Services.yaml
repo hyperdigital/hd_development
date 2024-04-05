@@ -1,0 +1,10 @@
+services:
+  # general settings
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: true
+
+  Hyperdigital\HdDevelopment\:
+    resource: '../Classes/*'
+    public: true
