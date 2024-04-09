@@ -18,6 +18,14 @@
                             </config>
                         </TCEforms>
                     </settings.templateFile>
+                    <settings.additionalPartialPaths>
+                        <TCEforms>
+                            <label>Additional partial paths</label>
+                            <config>
+                                <type>folder</type>
+                            </config>
+                        </TCEforms>
+                    </settings.additionalPartialPaths>
                     <settings.variables>
                         <TCEforms>
                             <label>Variables as json object</label>
