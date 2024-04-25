@@ -28,7 +28,13 @@ class ContentElementController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionC
 
     public function showAction()
     {
-        $this->contentObj = $this->configurationManager->getContentObject();
+        $version = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Information\Typo3Version::class);
+
+        if ($version->getMajorVersion() >= 12) {
+            $this->contentObj = $this->request->getAttribute('currentContentObject');
+        } else {
+            $this->contentObj = $this->configurationManager->getContentObject();
+        }
 
         $template = $this->fileRepository->findByRelation('tt_content', 'settings.templateFile', $this->contentObj->data['uid'])[0] ?? false;
 

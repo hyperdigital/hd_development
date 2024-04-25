@@ -3,16 +3,24 @@
 defined('TYPO3') or die();
 
 (static function (): void {
-    \TYPO3\CMS\Extbase\Utility\ExtensionUtility::registerPlugin(
+    $signatureV13 = \TYPO3\CMS\Extbase\Utility\ExtensionUtility::registerPlugin(
         'HdDevelopment',
         'ContentElement',
         'Development: Content Element',
     );
 
-    $GLOBALS['TCA']['tt_content']['types']['list']['subtypes_addlist']['hddevelopment_contentelement'] = 'pi_flexform';
+    $version = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Information\Typo3Version::class);
+
+    if ($version->getMajorVersion() >= 13) {
+        $signature = $signatureV13;
+    } else {
+        $signature = 'hddevelopment_contentelement';
+    }
+
+    $GLOBALS['TCA']['tt_content']['types']['list']['subtypes_addlist'][$signature] = 'pi_flexform';
 
     \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
-        'hddevelopment_contentelement',
+        $signature,
         'FILE:EXT:hd_development/Configuration/FlexForms/contentelement.xml'
     );
 })();
