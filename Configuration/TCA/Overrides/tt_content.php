@@ -19,8 +19,15 @@ defined('TYPO3') or die();
 
     $GLOBALS['TCA']['tt_content']['types']['list']['subtypes_addlist'][$signature] = 'pi_flexform';
 
-    \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
-        $signature,
-        'FILE:EXT:hd_development/Configuration/FlexForms/contentelement.xml'
-    );
+    if ($version->getMajorVersion() >= 12) {
+        \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
+            $signature,
+            'FILE:EXT:hd_development/Configuration/FlexForms/contentelement.xml'
+        );
+    } else {
+        \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
+            $signature,
+            'FILE:EXT:hd_development/Configuration/FlexForms/contentelementV11.xml'
+        );
+    }
 })();
