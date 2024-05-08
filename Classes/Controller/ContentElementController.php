@@ -21,7 +21,7 @@ class ContentElementController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionC
 
     public function __construct(
         protected readonly FileRepository $fileRepository,
-    protected readonly ResourceFactory $resourceFactory,
+        protected readonly ResourceFactory $resourceFactory,
     ) {
 
     }
