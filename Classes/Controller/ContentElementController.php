@@ -5,6 +5,7 @@ namespace Hyperdigital\HdDevelopment\Controller;
 
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Core\Configuration\ConfigurationManager;
+use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Resource\FileReference;
 use TYPO3\CMS\Core\Resource\FileRepository;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
@@ -28,13 +29,7 @@ class ContentElementController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionC
 
     public function showAction()
     {
-        $version = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Information\Typo3Version::class);
-
-        if ($version->getMajorVersion() >= 12) {
-            $this->contentObj = $this->request->getAttribute('currentContentObject');
-        } else {
-            $this->contentObj = $this->configurationManager->getContentObject();
-        }
+        $this->contentObj = $this->configurationManager->getContentObject();
 
         $template = $this->fileRepository->findByRelation('tt_content', 'settings.templateFile', $this->contentObj->data['uid'])[0] ?? false;
 
@@ -66,6 +61,17 @@ class ContentElementController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionC
                             $newTempPath = $basePath . ltrim( $readablePath, '/' );
                             $paths[] = $newTempPath;
                         }
+                    }
+
+                    $storageConfiguration = $template->getOriginalFile()->getStorage()->getStorageRecord()['configuration'];
+                    if ($storageConfiguration['pathType'] == 'relative') {
+                        $path = Environment::getPublicPath() . '/' . $storageConfiguration['basePath'];
+                    } else if ($storageConfiguration['pathType'] == 'absolute') {
+                        $path = $storageConfiguration['basePath'];
+                    }
+
+                    if ($path) {
+                        $paths[] = $path;
                     }
 
                     $view->setPartialRootPaths($paths);
