@@ -14,6 +14,7 @@ use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface;
 use TYPO3\CMS\Extbase\Utility\DebuggerUtility;
 use TYPO3\CMS\Fluid\View\StandaloneView;
+use TYPO3\CMS\Core\Core\Environment;
 
 class ContentElementController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionController
 {
