@@ -5,7 +5,6 @@ namespace Hyperdigital\HdDevelopment\Controller;
 
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Core\Configuration\ConfigurationManager;
-use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Resource\FileReference;
 use TYPO3\CMS\Core\Resource\FileRepository;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
@@ -15,6 +14,7 @@ use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface;
 use TYPO3\CMS\Extbase\Utility\DebuggerUtility;
 use TYPO3\CMS\Fluid\View\StandaloneView;
+use TYPO3\CMS\Core\Core\Environment;
 
 class ContentElementController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionController
 {
@@ -22,14 +22,20 @@ class ContentElementController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionC
 
     public function __construct(
         protected readonly FileRepository $fileRepository,
-    protected readonly ResourceFactory $resourceFactory,
+        protected readonly ResourceFactory $resourceFactory,
     ) {
 
     }
 
     public function showAction()
     {
-        $this->contentObj = $this->configurationManager->getContentObject();
+        $version = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Information\Typo3Version::class);
+
+        if ($version->getMajorVersion() >= 12) {
+            $this->contentObj = $this->request->getAttribute('currentContentObject');
+        } else {
+            $this->contentObj = $this->configurationManager->getContentObject();
+        }
 
         $template = $this->fileRepository->findByRelation('tt_content', 'settings.templateFile', $this->contentObj->data['uid'])[0] ?? false;
 

@@ -1,0 +1,9 @@
+<div>
+	<f:if condition="{documentations}">
+		<f:for each="{documentations}" key="key" as="doc">
+			<p>
+				<f:link.action class="btn btn-default" action="documentation" arguments="{documentation: key}">{doc.label}</f:link.action>
+			</p>
+		</f:for>
+	</f:if>
+</div>
