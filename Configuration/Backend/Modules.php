@@ -21,7 +21,7 @@ return [
         'parent' => 'file',
         'position' => ['after' => 'filelist'],
         'access' => 'group',
-        'iconIdentifier' => 'hd_development',
+        'iconIdentifier' => 'hd_development_documentation',
         'navigationComponentId' => '',
         'inheritNavigationComponentFromMainModule' => false,
         'labels' => 'LLL:EXT:hd_development/Resources/Private/Language/locallang_module_documentation.xlf',
