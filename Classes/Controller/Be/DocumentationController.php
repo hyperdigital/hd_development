@@ -3,12 +3,15 @@ declare(strict_types=1);
 
 namespace Hyperdigital\HdDevelopment\Controller\Be;
 
+use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Domain\Repository\PageRepository;
+use TYPO3\CMS\Core\Imaging\Icon;
+use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Localization\Locales;
 use TYPO3\CMS\Core\Service\FlexFormService;
@@ -55,6 +58,18 @@ class DocumentationController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionCo
 
     public function documentationAction(string $documentation)
     {
+        $uriBuilder = $this->uriBuilder->setRequest($this->request);
+        $iconFactory = GeneralUtility::makeInstance(IconFactory::class);
+
+        $buttonBar = $this->moduleTemplate->getDocHeaderComponent()->getButtonBar();
+        $returnButton = $buttonBar->makeLinkButton()
+            ->setHref($uriBuilder->reset()->uriFor('index'))
+            ->setIcon($iconFactory->getIcon('actions-arrow-down-left', Icon::SIZE_SMALL))
+            ->setShowLabelText(true)
+            ->setTitle('Return');
+        $buttonBar->addButton($returnButton, ButtonBar::BUTTON_POSITION_LEFT, 1);
+
+
         $documentation = $GLOBALS['TYPO3_CONF_VARS']['documentation'][$documentation];
 
         if ($documentation && !empty($documentation['path'])) {

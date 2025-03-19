@@ -1,3 +1,7 @@
+<f:asset.css identifier="hddocumentation-documentation" href="EXT:hd_development/Resources/Public/css/documentation.css"></f:asset.css>
+
 <f:if condition="{content}">
-	{content -> f:format.raw()}
+	<div class="documentation">
+		{content -> f:format.raw()}
+	</div>
 </f:if>
