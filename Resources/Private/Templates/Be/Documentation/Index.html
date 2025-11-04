@@ -1,9 +1,19 @@
-<div>
-	<f:if condition="{documentations}">
-		<f:for each="{documentations}" key="key" as="doc">
-			<p>
-				<f:link.action class="btn btn-default" action="documentation" arguments="{documentation: key}">{doc.label}</f:link.action>
-			</p>
-		</f:for>
-	</f:if>
-</div>
+<html
+		xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+		xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+		xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+		data-namespace-typo3-fluid="true">
+<f:layout name="Module" />
+
+<f:section name="Content">
+	<h1>Documentations</h1>
+	<div>
+		<f:if condition="{documentations}">
+			<f:for each="{documentations}" key="key" as="doc">
+				<p>
+					<f:link.action class="btn btn-default" action="documentation" arguments="{documentation: key}">{doc.label}</f:link.action>
+				</p>
+			</f:for>
+		</f:if>
+	</div>
+</f:section>

@@ -1,3 +1,11 @@
+<html
+		xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+		xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+		xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+		data-namespace-typo3-fluid="true">
+<f:layout name="Module" />
+
+<f:section name="Content">
 <f:asset.css identifier="hddocumentation-documentation" href="EXT:hd_development/Resources/Public/css/documentation.css"></f:asset.css>
 
 <f:if condition="{content}">
@@ -5,3 +13,5 @@
 		{content -> f:format.raw()}
 	</div>
 </f:if>
+</f:section>
+</html>

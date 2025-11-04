@@ -1,0 +1,4 @@
+# cat=Settings; type=string; label=Styleguide PID [comma separated list]
+styleguides =
+# cat=Settings; type=string; label=Styleguide importing content file page (it's possible to use EXT) :if inserted path of folder, each file is the imported file
+styleguideSource =

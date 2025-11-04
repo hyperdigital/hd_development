@@ -1,0 +1,35 @@
+<html
+        xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+        xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+        xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+        data-namespace-typo3-fluid="true">
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <f:if condition="{styleguides}">
+        <f:then>
+            <h1>Styleguides</h1>
+            <f:link.action action="runSync" class="btn btn-default">Run Sync</f:link.action>
+        </f:then>
+        <f:else>
+            <h1>Styleguides</h1>
+            <p>You don't have set any styleguide element yet. Create your import file like that:</p>
+            <f:spaceless>
+                <pre>return [
+                  'textpic' => [ // This is one complete page with testing elements
+                      'title' => 'Text&Pic', // Required
+                      'icon' => 'EXT:hd_development/Resources/Public/Icons/styleguide-icon.svg',
+                      'elements' => [
+                        'textpic_img_left' => [ // Database fields
+                          'header' => 'Text&Pic with image left',
+                          'cType' => 'textpic'
+                        ]
+                      ]
+                    ]
+                ];</pre>
+            </f:spaceless>
+        </f:else>
+    </f:if>
+
+    <f:link.action action="getSettingsIndex" class="btn btn-default">Get settings</f:link.action>
+</f:section>

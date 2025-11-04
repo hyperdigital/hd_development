@@ -1,0 +1,25 @@
+<html
+		xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+		xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+		xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+		data-namespace-typo3-fluid="true">
+<f:layout name="Module" />
+
+<f:section name="Content">
+	<div>
+	<div>'{page.slug}' => [</div>
+	<div>&nbsp;&nbsp;&nbsp;&nbsp;'title' => '{page.title}',</div>
+	<div>&nbsp;&nbsp;&nbsp;&nbsp;'elements' => [</div>
+<f:if condition="{elements}">
+	<f:for each="{elements}" as="element">
+		<div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'{page.slug}_{element.uid}' => [</div>
+		<f:for each="{element}" as="value" key="key">
+			<f:if condition="{key} != 'uid'"><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'{key}' => '{value}',</div></f:if>
+		</f:for>
+		<div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;],</div>
+	</f:for>
+</f:if>
+	<div>&nbsp;&nbsp;&nbsp;&nbsp;],</div>
+<div>]</div>
+</div>
+</f:section>

@@ -38,11 +38,3 @@
 .documentation img{
 	max-width: 100%;
 }
-.documentation pre>code{
-	display: block;
-	background-color:#EEEEEE;
-	font-family: monospace;
-	padding: 2px;
-	font-size: 1em;
-	line-height: 1.75;
-}

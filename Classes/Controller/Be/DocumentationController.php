@@ -16,7 +16,7 @@ use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Localization\Locales;
 use TYPO3\CMS\Core\Service\FlexFormService;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder;
+use TYPO3\CMS\Extbase\Mvc\Routing\UriBuilder;
 use TYPO3\CMS\Extbase\Utility\DebuggerUtility;
 use TYPO3\CMS\Extensionmanager\Utility\ListUtility;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
@@ -32,18 +32,16 @@ class DocumentationController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionCo
     protected $pageRepository;
     protected $moduleTemplateFactory;
     protected $moduleTemplate;
-    protected $uriBuilder;
 
     public function __construct(
-        ModuleTemplateFactory  $moduleTemplateFactory,
-        UriBuilder $uriBuilder
+        ModuleTemplateFactory  $moduleTemplateFactory
     )
     {
         $this->moduleTemplateFactory = $moduleTemplateFactory;
-        $this->uriBuilder = $uriBuilder;
+        $this->uriBuilder = GeneralUtility::makeInstance(\TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder::class);
     }
 
-    public function initializeAction()
+    public function initializeAction():void
     {
         parent::initializeAction();
 
@@ -52,19 +50,22 @@ class DocumentationController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionCo
 
     public function indexAction()
     {
+        $moduleTemplate = $this->moduleTemplateFactory->create($this->request);
+        
         $documentations = $GLOBALS['TYPO3_CONF_VARS']['documentation'];
         if (!empty($GLOBALS['TYPO3_CONF_VARS']['documentation'])) {
-            $this->view->assign('documentations', $documentations);
+            $moduleTemplate->assign('documentations', $documentations);
         } else {
             die('todo: Missing paths');
         }
 
-        $this->moduleTemplate->setContent($this->view->render());
-        return $this->htmlResponse($this->moduleTemplate->renderContent());;
+        return $moduleTemplate->renderResponse('Be/Documentation/Index');
     }
 
     public function documentationAction(string $documentation)
     {
+        $moduleTemplate = $this->moduleTemplateFactory->create($this->request);
+
         $documentationKey = $documentation;
 
         $uriBuilder = $this->uriBuilder->setRequest($this->request);
@@ -94,7 +95,7 @@ class DocumentationController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionCo
                 $markdown = file_get_contents($path);
                 $parsedTexts = $parsedown->text($markdown);
                 $this->fixRelativeLinks($parsedTexts, dirname($path), $documentationKey.''); // maybe would need separated parts
-                $this->view->assign('content',  $parsedTexts);
+                $moduleTemplate->assign('content',  $parsedTexts);
             } else {
                 die('todo: Missing documentation');
             }
@@ -102,8 +103,7 @@ class DocumentationController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionCo
             die('todo: Missing documentation');
         }
 
-        $this->moduleTemplate->setContent($this->view->render());
-        return $this->htmlResponse($this->moduleTemplate->renderContent());;
+        return $moduleTemplate->renderResponse('Be/Documentation/Documentation');
     }
 
     protected function fixRelativeLinks(&$content, $basePath, $filenamePrefix)
