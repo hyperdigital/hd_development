@@ -54,11 +54,10 @@ class StyleguideService
 
                     if (!empty($pageData['elements'])) {
                         foreach ($pageData['elements'] as $elementKey => $elementData) {
-                            $element = $this->getTestinElement($page['uid'], $elementKey);
+                            $element = $this->getTestingElement($page['uid'], $elementKey);
                             if (!$element) {
                                 $element = $this->createTestingElement($page['uid'], $elementKey, $elementData);
                             } else {
-
                                 $element = $this->updateTestingElement($element['uid'], $elementKey, $elementData);
                             }
                         }
@@ -171,7 +170,7 @@ class StyleguideService
         return $page;
     }
 
-    protected function getTestinElement($pid, $elementKey)
+    protected function getTestingElement($pid, $elementKey)
     {
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getQueryBuilderForTable('tt_content');
@@ -201,6 +200,9 @@ class StyleguideService
 
         $images = [];
         $replacements = [];
+        
+        $relatedTables = [];
+
 
         foreach ($pageData as $dataKey => $dataValue) {
             if ($dataKey == 'sys_file_references') {
@@ -213,7 +215,33 @@ class StyleguideService
                 continue;
             }
 
-            $values[$dataKey] = $dataValue;
+            if ($dataValue === false) {
+
+            } else if (is_array($dataValue)) {
+                if (!empty($GLOBALS['TCA']['tt_content']['columns'][$dataKey])) {
+                    switch ($GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['type']) {
+                        case 'inline':
+                            $forignTable = $GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['foreign_table'];
+                            $foreignField = $GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['foreign_field'];
+
+                            foreach ($dataValue as $inlineValues) {
+                                if (empty($relatedTables[$forignTable])) {
+                                    $relatedTables[$forignTable] = [
+                                        'foreignField' => $foreignField,
+                                        'data' => []
+                                    ];
+                                }
+
+                                $relatedTables[$forignTable]['data'][] = $inlineValues;
+                            }
+
+                            $values[$dataKey] = count($dataValue);
+                            break;
+                    }
+                }
+            } else {
+                $values[$dataKey] = $dataValue;
+            }
         }
 
         foreach ($replacements as $column => $replacement) {
@@ -247,6 +275,10 @@ class StyleguideService
             $this->generateImages($images, $element);
         }
 
+        if ($relatedTables) {
+            $this->generateRelatedTables($relatedTables, $element);
+        }
+
         return $element;
     }
 
@@ -255,6 +287,7 @@ class StyleguideService
         $values = [];
         $images = [];
         $replacements = [];
+        $relatedTables = [];
 
         foreach ($pageData as $dataKey => $dataValue) {
             if ($dataKey == 'sys_file_references') {
@@ -265,7 +298,33 @@ class StyleguideService
                 continue;
             }
 
-            $values[$dataKey] = $dataValue;
+            if ($dataValue === false) {
+
+            } else if (is_array($dataValue)) {
+                if (!empty($GLOBALS['TCA']['tt_content']['columns'][$dataKey])) {
+                    switch ($GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['type']) {
+                        case 'inline':
+                            $forignTable = $GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['foreign_table'];
+                            $foreignField = $GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['foreign_field'];
+
+                            foreach ($dataValue as $inlineValues) {
+                                if (empty($relatedTables[$forignTable])) {
+                                    $relatedTables[$forignTable] = [
+                                        'foreignField' => $foreignField,
+                                        'data' => []
+                                    ];
+                                }
+
+                                $relatedTables[$forignTable]['data'][] = $inlineValues;
+                            }
+
+                            $values[$dataKey] = count($dataValue);
+                            break;
+                    }
+                }
+            } else {
+                $values[$dataKey] = $dataValue;
+            }
         }
 
 
@@ -306,7 +365,88 @@ class StyleguideService
         if (!empty($images)) {
             $this->generateImages($images, $element);
         }
+
+        if ($relatedTables) {
+            $this->generateRelatedTables($relatedTables, $element);
+        }
+
         return $element;
+    }
+
+    protected function generateRelatedTables($relatedTables, $parentElement)
+    {
+        foreach ($relatedTables as $table => $rows) {
+            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+                ->getQueryBuilderForTable($table);
+
+            $existingElements = $queryBuilder
+                ->select('*')
+                ->from($table)
+                ->where(
+                    $queryBuilder->expr()->eq($rows['foreignField'], $queryBuilder->createNamedParameter((int)$parentElement['uid'], Types::INTEGER))
+                )
+                ->executeQuery()
+                ->fetchAllAssociative();
+            $updates = [];
+
+            foreach ($rows['data'] as $row) {
+                $values = [];
+                foreach ($row as $key => $value) {
+                    if ($key == $rows['foreignField']) {
+                        $values[$key] = $parentElement['uid'];
+                    } else {
+                        $values[$key] = $value;
+                    }
+                }
+                $values['pid'] = $parentElement['pid'];
+
+                if (!$existingElements) {
+                    $queryBuilder->insert($table)
+                        ->values($values)
+                        ->executeStatement();
+                } else {
+                    $updates[] = $values;
+                }
+            }
+
+            if ($updates) {
+                // TODO: UPdate existing stuff if needed
+                
+                for ($i = 0; $i < count($existingElements); $i++) {
+                    if (empty($updates[$i])) {
+                        $queryBuilder->update($table);
+                        $query = $query->set('deleted', 1);
+                        $query = $query->set('hidden', 1);
+                        $query->where(
+                            $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($existingElements[$i]['uid'], Types::INTEGER))
+                        );
+                        $query->executeStatement();
+                    } else {
+                        $query = $queryBuilder->update($table);
+                        foreach ($updates[$i] as $key => $value) {
+                            if ($key == 'hd_dev_styleguide') {
+                                continue;
+                            }
+                            $query = $query->set($key, $value);
+                        }
+                        $query->where(
+                            $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($existingElements[$i]['uid'], Types::INTEGER))
+                        );
+                        $query->executeStatement();
+
+                        unset($updates[$i]);
+                    }
+                }
+
+                if (!empty($updates)) {
+                    foreach ($updates as $values) {
+                        $queryBuilder->insert($table)
+                            ->values($values)
+                            ->executeStatement();
+                    }
+                }
+            }
+        }
     }
 
     protected function generateReplacementsForFileTypolinks($dataValue, &$replacements = [])

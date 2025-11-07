@@ -5,14 +5,17 @@
 		data-namespace-typo3-fluid="true">
 <f:layout name="Module" />
 
-<f:section name="Content">
+<f:section name="Content"><pre><code><small><f:format.htmlentities><?php</f:format.htmlentities>
+    return {elements -> f:format.raw()};</small></code></pre></f:section>
+
+<f:section name="Content2">
 	<div>
 	<div>'{page.slug}' => [</div>
 	<div>&nbsp;&nbsp;&nbsp;&nbsp;'title' => '{page.title}',</div>
 	<div>&nbsp;&nbsp;&nbsp;&nbsp;'elements' => [</div>
 <f:if condition="{elements}">
-	<f:for each="{elements}" as="element">
-		<div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'{page.slug}_{element.uid}' => [</div>
+	<f:for each="{elements}" as="element" key="parentKey">
+		<div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'{page.slug}_' => [</div>
 		<f:for each="{element}" as="value" key="key">
 			<f:if condition="{key} != 'uid'"><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'{key}' => '{value}',</div></f:if>
 		</f:for>

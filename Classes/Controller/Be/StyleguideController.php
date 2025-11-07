@@ -38,10 +38,10 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
 
     protected $ignoreTtContentFields = [
         'rowDescription', 'pid', 'tstamp', 'crdate', 'cruser_id', 'deleted', 'hidden', 'starttime', 'endtime',
-        'fe_group', 'sorting', 'editlock', 'sys_language_uid', 'l18n_parent', 'l10n_source', 'l10n_state',
+        'fe_group', 'editlock', 'sys_language_uid', 'l18n_parent', 'l10n_source', 'l10n_state',
         't3_origuid', 'l18n_diffsource', 't3ver_oid', 't3ver_id', 'l10n_state', 't3ver_label', 't3ver_wsid',
         't3ver_state', 't3ver_stage', 't3ver_count', 't3ver_tstamp', 't3ver_move_id', 'l10nmgr_language_restriction',
-        'l10n_cfg','hd_dev_styleguide'
+        'l10n_cfg','hd_dev_styleguide', 'l10n_parent', 'l10n_diffsource'
     ];
 
     public function __construct(
@@ -104,13 +104,12 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
     public function getSettingsPageAction()
     {
         $moduleTemplate = $this->moduleTemplateFactory->create($this->request);
-
+        $elements = '';
         if ($this->request->hasArgument('source')) {
             $pageRepository = GeneralUtility::makeInstance(PageRepository::class);
             $page = $pageRepository->getPage((int) $this->request->getArgument('source'), true);
             if ($page) {
                 $page['slug'] = str_replace('/','-', trim($page['slug'], '/'));
-                $moduleTemplate->assign('page', $page);
 
                 $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
                     ->getQueryBuilderForTable('tt_content');
@@ -129,19 +128,101 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
 
                 $elements = [];
                 foreach($rows as $row) {
-                    foreach ($this->ignoreTtContentFields as $field) {
-                        if (isset($row[$field])) {
-                            unset($row[$field]);
+                    $newRow = [];
+                    foreach ($row as $key => $value) {
+                        if (in_array($key, $this->ignoreTtContentFields)) {
+                            continue;
+                        }
+                        
+                        if(!empty($GLOBALS['TCA']['tt_content']['columns'][$key])) {
+                            $newRow[$key] = $this->getRecursiveValue('tt_content', $key, $value, $row);
+                        } else if (in_array($key, ['sorting'])) {
+                            $newRow[$key] = $value;
                         }
                     }
-                    $elements[] = $row;
-                }
 
-                $moduleTemplate->assign('elements', $elements);
+                    $elements[$page['slug'] .'_' .$row['uid']] = $newRow;
+                }
+                $elements = $this->pretty_var([
+                    $page['slug'] => [
+                        'title' => $page['title'],
+                        'elements' => $elements
+                    ]
+                ]);
+
             }
 
         }
 
+        $moduleTemplate->assign('elements', $elements);
+
         return $moduleTemplate->renderResponse('Be/Styleguide/SettingsPage');
     }
+
+    protected function pretty_var($myArray){
+
+        return str_replace(array("\n"," "),array("<br>","&nbsp;"), htmlentities(var_export($myArray,true)));
+
+    }
+    
+    protected function getRecursiveValue($tablename, $fieldname, $value, $row)
+    {
+        $type = $GLOBALS['TCA'][$tablename]['columns'][$fieldname]['config']['type'];
+
+        switch ($type) {
+            case 'inline':
+                $config = $GLOBALS['TCA'][$tablename]['columns'][$fieldname]['config'];
+                return $this->getInlineTableData($row, $config);
+                break;
+            default:
+                return $value;
+        }
+    }
+
+    protected function getInlineTableData($parentRow, $tcaConfig)
+    {
+        $forignTable = $tcaConfig['foreign_table'];
+        $foreignField = $tcaConfig['foreign_field'];
+
+        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+            ->getQueryBuilderForTable($forignTable);
+        $rows = $queryBuilder
+            ->select('*')
+            ->from($forignTable)
+            ->where(
+                $queryBuilder->expr()->eq($foreignField, $queryBuilder->createNamedParameter($parentRow['uid'], Types::INTEGER)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Types::INTEGER)),
+                $queryBuilder->expr()->eq('hidden', $queryBuilder->createNamedParameter(0, Types::INTEGER))
+            )
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        if (!$rows) {
+            return false;
+        }
+
+        $newRows = [];
+        foreach ($rows as $row) {
+            $newRow = [];
+            foreach ($row as $key => $value) {
+                if (in_array($key, $this->ignoreTtContentFields)) {
+                    continue;
+                }
+                if ($key == $foreignField) {
+                    $newRow[$key] = '###UID###';
+                } else if (!in_array($key, ['uid', 'pid'])) {
+                    if(!empty($GLOBALS['TCA'][$forignTable]['columns'][$key])) {
+                        $newRow[$key] = $this->getRecursiveValue($forignTable, $key, $value, $row);
+                    }
+                }
+            }
+            if (!empty($newRow)){
+                $newRows[] = $newRow;
+            }
+        }
+
+        return $newRows;
+    }
+
+
 }
