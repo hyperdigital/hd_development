@@ -109,7 +109,11 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
             $pageRepository = GeneralUtility::makeInstance(PageRepository::class);
             $page = $pageRepository->getPage((int) $this->request->getArgument('source'), true);
             if ($page) {
-                $page['slug'] = str_replace('/','-', trim($page['slug'], '/'));
+                if (!empty($page['hd_dev_styleguide'])) {
+                    $page['slug'] = $page['hd_dev_styleguide'];
+                } else {
+                    $page['slug'] = str_replace('/', '-', trim($page['slug'], '/'));
+                }
 
                 $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
                     ->getQueryBuilderForTable('tt_content');
