@@ -144,8 +144,9 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
                             $newRow[$key] = $value;
                         }
                     }
+                    $elementSlug = (!empty($row['hd_dev_styleguide'])) ? $row['hd_dev_styleguide'] : $page['slug'] .'_' .$row['uid'];
 
-                    $elements[$page['slug'] .'_' .$row['uid']] = $newRow;
+                    $elements[$elementSlug] = $newRow;
                 }
                 $elements = $this->pretty_var([
                     $page['slug'] => [
