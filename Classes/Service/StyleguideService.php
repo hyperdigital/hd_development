@@ -202,6 +202,7 @@ class StyleguideService
         $replacements = [];
         
         $relatedTables = [];
+        $fileReferences = [];
 
 
         foreach ($pageData as $dataKey => $dataValue) {
@@ -237,12 +238,36 @@ class StyleguideService
 
                             $values[$dataKey] = count($dataValue);
                             break;
+                        case 'file':
+
+                            foreach ($dataValue as $inlineValues) {
+                                if (empty($relatedTables['sys_file_reference'])) {
+                                    $relatedTables['sys_file_reference'] = [
+                                        'foreignField' => 'uid_foreign',
+                                        'data' => []
+                                    ];
+                                }
+
+                                /**
+                                 * ###IMAGE###
+                                 * ###VIDEO###
+                                 */
+                                $inlineValues['uid_local'] = $this->findFileByType($inlineValues['uid_local']);
+                                if (!$inlineValues['uid_local'] ) {
+                                    continue;
+                                }
+                                $relatedTables['sys_file_reference']['data'][] = $inlineValues;
+                            }
+
+                            $values[$dataKey] = count($dataValue);
+                            break;
                     }
                 }
             } else {
                 $values[$dataKey] = $dataValue;
             }
         }
+
 
         foreach ($replacements as $column => $replacement) {
             foreach ($replacement as $search => $replace) {
@@ -316,6 +341,29 @@ class StyleguideService
                                 }
 
                                 $relatedTables[$forignTable]['data'][] = $inlineValues;
+                            }
+
+                            $values[$dataKey] = count($dataValue);
+                            break;
+                        case 'file':
+
+                            foreach ($dataValue as $inlineValues) {
+                                if (empty($relatedTables['sys_file_reference'])) {
+                                    $relatedTables['sys_file_reference'] = [
+                                        'foreignField' => 'uid_foreign',
+                                        'data' => []
+                                    ];
+                                }
+
+                                /**
+                                 * ###IMAGE###
+                                 * ###VIDEO###
+                                 */
+                                $inlineValues['uid_local'] = $this->findFileByType($inlineValues['uid_local']);
+                                if (!$inlineValues['uid_local'] ) {
+                                    continue;
+                                }
+                                $relatedTables['sys_file_reference']['data'][] = $inlineValues;
                             }
 
                             $values[$dataKey] = count($dataValue);
@@ -447,6 +495,63 @@ class StyleguideService
                 }
             }
         }
+    }
+
+    /**
+     * Available types
+     * ###IMAGE###
+     * ###VIDEO###
+     */
+    protected function findFileByType($type)
+    {
+        switch ($type) {
+            case '###IMAGE###':
+                $originalPath = 'EXT:hd_development/Resources/Public/Images/Desktop.png';
+                break;
+            case '###VIDEO###':
+                $originalPath = 'EXT:hd_development/Resources/Public/Videos/dummy_video.mp4';
+                break;
+            default:
+                $originalPath = false;
+                break;
+        }
+        if (!$originalPath) {
+            return false;
+        }
+        $absolutePath = GeneralUtility::getFileAbsFileName($originalPath);
+
+        $connection = GeneralUtility::makeInstance(ConnectionPool::class)
+            ->getConnectionForTable('sys_file');
+
+        $existingFileUid = $connection->select(
+            ['uid'],
+            'sys_file',
+            [
+                'hd_dev_styleguide' => $originalPath, // store raw EXT: path here
+                'missing' => 0
+            ]
+        )->fetchOne();
+
+        if ($existingFileUid) {
+            $uidLocal = $existingFileUid;
+        } else {
+            // 2. Index the file into FAL
+            $storage = GeneralUtility::makeInstance(ResourceFactory::class)->getDefaultStorage();
+            if (!$storage->getRootLevelFolder()->hasFolder('testingImages')) {
+                $storage->getRootLevelFolder()->createFolder('testingImages');
+            }
+            $fileObject = $storage->addFile($absolutePath, $storage->getRootLevelFolder()->getSubfolder('testingImages'), '', DuplicationBehavior::RENAME, false); // true = index if not indexed
+            $uidLocal = $fileObject->getUid();
+
+            // 3. Update hd_dev_styleguide field
+            $connection->update(
+                'sys_file',
+                ['hd_dev_styleguide' => $originalPath],
+                ['uid' => $uidLocal]
+            );
+        }
+
+        return $uidLocal;
     }
 
     protected function generateReplacementsForFileTypolinks($dataValue, &$replacements = [])

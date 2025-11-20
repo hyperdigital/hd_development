@@ -17,6 +17,7 @@ use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Localization\Locales;
+use TYPO3\CMS\Core\Resource\FileRepository;
 use TYPO3\CMS\Core\Service\FlexFormService;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder;
@@ -35,6 +36,7 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
     protected $pageRepository;
     protected $moduleTemplateFactory;
     protected $moduleTemplate;
+    protected $fileRepository;
 
     protected $ignoreTtContentFields = [
         'rowDescription', 'pid', 'tstamp', 'crdate', 'cruser_id', 'deleted', 'hidden', 'starttime', 'endtime',
@@ -45,11 +47,13 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
     ];
 
     public function __construct(
-        ModuleTemplateFactory $moduleTemplateFactory
+        ModuleTemplateFactory $moduleTemplateFactory,
+        FileRepository $fileRepository
     )
     {
         $this->moduleTemplateFactory = $moduleTemplateFactory;
         $this->uriBuilder = GeneralUtility::makeInstance(\TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder::class);
+        $this->fileRepository = $fileRepository;
     }
 
     public function initializeAction():void
@@ -148,6 +152,7 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
 
                     $elements[$elementSlug] = $newRow;
                 }
+                
                 $elements = $this->pretty_var([
                     $page['slug'] => [
                         'title' => $page['title'],
@@ -179,9 +184,82 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
                 $config = $GLOBALS['TCA'][$tablename]['columns'][$fieldname]['config'];
                 return $this->getInlineTableData($row, $config);
                 break;
+            case 'file':
+                $config = $GLOBALS['TCA'][$tablename]['columns'][$fieldname]['config'];
+                return $this->getFileData($row, $config, $fieldname, 'tt_content');
             default:
                 return $value;
         }
+    }
+
+    protected function getFileData($parentRow, $tcaConfig, $fieldname, $parentTable)
+    {
+        $foreignField = 'uid_foreign';
+        $forignTable = 'sys_file_reference';
+        $fileKey = 'uid_local';
+
+        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+            ->getQueryBuilderForTable($forignTable);
+        $rows = $queryBuilder
+            ->select('*')
+            ->from($forignTable)
+            ->where(
+                $queryBuilder->expr()->eq('tablenames', $queryBuilder->createNamedParameter($parentTable, Types::STRING)),
+                $queryBuilder->expr()->eq('fieldname', $queryBuilder->createNamedParameter($fieldname, Types::STRING)),
+                $queryBuilder->expr()->eq($foreignField, $queryBuilder->createNamedParameter($parentRow['uid'], Types::INTEGER)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Types::INTEGER)),
+                $queryBuilder->expr()->eq('hidden', $queryBuilder->createNamedParameter(0, Types::INTEGER))
+            )
+            ->executeQuery()
+            ->fetchAllAssociative();
+        if (!$rows) {
+            return 0;
+        }
+        
+        $newRows = [];
+        foreach ($rows as $row) {
+            $file = $this->fileRepository->findByUid($row[$fileKey]);
+            if (!$file) {
+                continue;
+            }
+
+            switch ($file->getType()) {
+                case 2:
+                    $fileShortcut = '###IMAGE###';
+                    break;
+                case 4:
+                    $fileShortcut = '###VIDEO###';
+                    break;
+                default:
+                    $fileShortcut = false;
+                    break;
+            }
+            
+            if (!$fileShortcut) {
+                continue;
+            }
+                
+            $newRow = [];
+            foreach ($row as $key => $value) {
+                if (in_array($key, $this->ignoreTtContentFields)) {
+                    continue;
+                }
+                if ($key == $foreignField) {
+                    $newRow[$key] = '###UID###';
+                } else if ($key == $fileKey) {
+                    $newRow[$key] = $fileShortcut;
+                } else if (!in_array($key, ['uid', 'pid'])) {
+                    if(!empty($GLOBALS['TCA'][$forignTable]['columns'][$key])) {
+                        $newRow[$key] = $this->getRecursiveValue($forignTable, $key, $value, $row);
+                    }
+                }
+            }
+            if (!empty($newRow)){
+                $newRows[] = $newRow;
+            }
+        }
+
+        return $newRows;
     }
 
     protected function getInlineTableData($parentRow, $tcaConfig)
