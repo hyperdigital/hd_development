@@ -37,7 +37,8 @@ class ContentElementController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionC
             $this->contentObj = $this->configurationManager->getContentObject();
         }
 
-        $template = $this->fileRepository->findByRelation('tt_content', 'settings.templateFile', $this->contentObj->data['uid'])[0] ?? false;
+        $recordUid = (int)($this->contentObj->data['_LOCALIZED_UID'] ?? $this->contentObj->data['uid']);
+        $template = $this->fileRepository->findByRelation('tt_content', 'settings.templateFile', $recordUid)[0] ?? false;
 
         if ($template) {
             $content = $template->getOriginalFile()->getStorage()->getFileContents($template);
