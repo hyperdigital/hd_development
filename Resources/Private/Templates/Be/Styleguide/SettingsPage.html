@@ -1,28 +1,68 @@
 <html
-		xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
-		xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
-		xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
-		data-namespace-typo3-fluid="true">
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+    xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+    data-namespace-typo3-fluid="true">
 <f:layout name="Module" />
 
-<f:section name="Content"><pre><code><small><f:format.htmlentities><?php</f:format.htmlentities>
-    return {elements -> f:format.raw()};</small></code></pre></f:section>
+<f:section name="Content">
+    <f:asset.css identifier="hd-backend-styles" href="EXT:hd_development/Resources/Public/css/backend.css" />
+    <f:asset.script identifier="hd-copy-clipboard" src="EXT:hd_development/Resources/Public/JavaScript/CopyToClipboard.js" />
 
-<f:section name="Content2">
-	<div>
-	<div>'{page.slug}' => [</div>
-	<div>&nbsp;&nbsp;&nbsp;&nbsp;'title' => '{page.title}',</div>
-	<div>&nbsp;&nbsp;&nbsp;&nbsp;'elements' => [</div>
-<f:if condition="{elements}">
-	<f:for each="{elements}" as="element" key="parentKey">
-		<div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'{page.slug}_' => [</div>
-		<f:for each="{element}" as="value" key="key">
-			<f:if condition="{key} != 'uid'"><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'{key}' => '{value}',</div></f:if>
-		</f:for>
-		<div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;],</div>
-	</f:for>
-</f:if>
-	<div>&nbsp;&nbsp;&nbsp;&nbsp;],</div>
-<div>]</div>
-</div>
+    <div class="hd-action-bar" style="margin-bottom: 1.5rem;">
+        <f:link.action action="getSettingsIndex" class="btn btn-hd-secondary">
+            <core:icon identifier="actions-arrow-left" size="small" /> Back to Export
+        </f:link.action>
+        <f:link.action action="index" class="btn btn-hd-secondary">
+            <core:icon identifier="actions-view-list-collapse" size="small" /> Back to Overview
+        </f:link.action>
+    </div>
+
+    <div class="hd-module-header">
+        <h1>Exported Configuration</h1>
+        <p class="hd-subtitle">Copy this PHP array to your styleguide configuration file</p>
+    </div>
+
+    <f:if condition="{elements}">
+        <f:then>
+            <div class="hd-alert hd-alert-success">
+                <div class="hd-alert-icon">
+                    <core:icon identifier="actions-check" size="small" />
+                </div>
+                <div class="hd-alert-content">
+                    <p class="hd-alert-title">Configuration Generated</p>
+                    <p class="hd-alert-text">Click the copy button or select the code below to copy it to your clipboard.</p>
+                </div>
+            </div>
+
+            <div class="hd-panel">
+                <div class="hd-panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 class="hd-panel-title">
+                        <core:icon identifier="mimetypes-text-php" size="small" /> PHP Configuration
+                    </h2>
+                    <button type="button" class="btn btn-hd-secondary" data-copy-target="config-code">
+                        <core:icon identifier="actions-clipboard" size="small" /> Copy Code
+                    </button>
+                </div>
+                <div class="hd-panel-body" style="padding: 0;">
+                    <div class="hd-code-block" style="margin: 0; border-radius: 0 0 4px 4px;">
+                        <pre><code id="config-code">&lt;?php
+return <f:format.htmlentities>{elements}</f:format.htmlentities>;</code></pre>
+                    </div>
+                </div>
+            </div>
+        </f:then>
+        <f:else>
+            <div class="hd-alert hd-alert-warning">
+                <div class="hd-alert-icon">
+                    <core:icon identifier="actions-exclamation-triangle" size="small" />
+                </div>
+                <div class="hd-alert-content">
+                    <p class="hd-alert-title">No Elements Found</p>
+                    <p class="hd-alert-text">No content elements were found on the specified page or the page does not exist.</p>
+                </div>
+            </div>
+        </f:else>
+    </f:if>
 </f:section>
+</html>

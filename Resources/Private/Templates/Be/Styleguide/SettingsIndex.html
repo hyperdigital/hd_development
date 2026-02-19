@@ -1,28 +1,72 @@
 <html
-		xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
-		xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
-		xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
-		data-namespace-typo3-fluid="true">
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+    xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+    data-namespace-typo3-fluid="true">
 <f:layout name="Module" />
 
 <f:section name="Content">
-	<h1>Get settings for the styleguide element</h1>
+    <f:asset.css identifier="hd-backend-styles" href="EXT:hd_development/Resources/Public/css/backend.css" />
 
-<h2>Only one element</h2>
-<f:form action="getSettingsContentElement">
-	<div>
-		<label>Content element UID:</label>
-		<f:form.textfield name="source" />
-		<f:form.submit value="Get settings" />
-	</div>
-</f:form>
+    <div class="hd-module-header">
+        <h1>Export Settings</h1>
+        <p class="hd-subtitle">Generate styleguide configuration from existing content elements</p>
+    </div>
 
-<h2>Whole page</h2>
-<f:form action="getSettingsPage">
-	<div>
-		<label>Page UID:</label>
-		<f:form.textfield name="source" />
-		<f:form.submit value="Get settings" />
-	</div>
-</f:form>
+    <div class="hd-alert hd-alert-info">
+        <div class="hd-alert-icon">
+            <core:icon identifier="actions-info" size="small" />
+        </div>
+        <div class="hd-alert-content">
+            <p class="hd-alert-title">How to use</p>
+            <p class="hd-alert-text">Enter a content element UID or page UID to generate the PHP configuration array. Copy the output and paste it into your styleguide configuration file.</p>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
+        <div class="hd-panel">
+            <div class="hd-panel-header">
+                <h2 class="hd-panel-title">
+                    <core:icon identifier="content-text" size="small" /> Export Single Element
+                </h2>
+            </div>
+            <div class="hd-panel-body">
+                <p style="color: var(--typo3-text-color-variant, #737373); margin-bottom: 1rem;">
+                    Export configuration for a single content element by its UID.
+                </p>
+                <f:form action="getSettingsContentElement">
+                    <div class="hd-form-group">
+                        <label class="hd-form-label" for="element-uid">Content Element UID</label>
+                        <f:form.textfield name="source" id="element-uid" class="hd-form-input" placeholder="e.g. 123" />
+                    </div>
+                    <div class="hd-form-group">
+                        <f:form.submit value="Export Element" class="btn btn-hd-primary" />
+                    </div>
+                </f:form>
+            </div>
+        </div>
+
+        <div class="hd-panel">
+            <div class="hd-panel-header">
+                <h2 class="hd-panel-title">
+                    <core:icon identifier="apps-pagetree-page-default" size="small" /> Export Entire Page
+                </h2>
+            </div>
+            <div class="hd-panel-body">
+                <p style="color: var(--typo3-text-color-variant, #737373); margin-bottom: 1rem;">
+                    Export configuration for all content elements on a page.
+                </p>
+                <f:form action="getSettingsPage">
+                    <div class="hd-form-group">
+                        <label class="hd-form-label" for="page-uid">Page UID</label>
+                        <f:form.textfield name="source" id="page-uid" class="hd-form-input" placeholder="e.g. 42" />
+                    </div>
+                    <div class="hd-form-group">
+                        <f:form.submit value="Export Page" class="btn btn-hd-primary" />
+                    </div>
+                </f:form>
+            </div>
+        </div>
+    </div>
 </f:section>
+</html>

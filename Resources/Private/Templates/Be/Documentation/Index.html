@@ -1,19 +1,74 @@
 <html
-		xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
-		xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
-		xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
-		data-namespace-typo3-fluid="true">
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+    xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+    data-namespace-typo3-fluid="true">
 <f:layout name="Module" />
 
 <f:section name="Content">
-	<h1>Documentations</h1>
-	<div>
-		<f:if condition="{documentations}">
-			<f:for each="{documentations}" key="key" as="doc">
-				<p>
-					<f:link.action class="btn btn-default" action="documentation" arguments="{documentation: key}">{doc.label}</f:link.action>
-				</p>
-			</f:for>
-		</f:if>
-	</div>
+    <f:asset.css identifier="hd-backend-styles" href="EXT:hd_development/Resources/Public/css/backend.css" />
+
+    <div class="hd-module-header">
+        <h1>Documentation</h1>
+        <p class="hd-subtitle">Project documentation and development guides</p>
+    </div>
+
+    <f:if condition="{error}">
+        <div class="hd-alert hd-alert-warning">
+            <div class="hd-alert-icon">
+                <core:icon identifier="actions-exclamation-triangle" size="small" />
+            </div>
+            <div class="hd-alert-content">
+                <p class="hd-alert-title">Configuration Required</p>
+                <p class="hd-alert-text">{error}</p>
+            </div>
+        </div>
+    </f:if>
+
+    <f:if condition="{documentations}">
+        <f:then>
+            <div class="hd-cards-grid">
+                <f:for each="{documentations}" key="key" as="doc">
+                    <f:link.action action="documentation" arguments="{documentation: key}" class="hd-card-link">
+                        <div class="hd-card">
+                            <div class="hd-card-icon">
+                                <core:icon identifier="mimetypes-text-text" size="default" />
+                            </div>
+                            <h3 class="hd-card-title">{doc.label}</h3>
+                            <f:if condition="{doc.description}">
+                                <p class="hd-card-description">{doc.description}</p>
+                            </f:if>
+                            <f:if condition="!{doc.description}">
+                                <p class="hd-card-description">Click to view documentation</p>
+                            </f:if>
+                        </div>
+                    </f:link.action>
+                </f:for>
+            </div>
+        </f:then>
+        <f:else if="{error}">
+        </f:else>
+        <f:else>
+            <div class="hd-empty-state">
+                <div class="hd-empty-state-icon">
+                    <core:icon identifier="mimetypes-text-text" size="large" />
+                </div>
+                <h2 class="hd-empty-state-title">No Documentation Available</h2>
+                <p class="hd-empty-state-text">
+                    Configure documentation paths in your site configuration or ext_localconf.php
+                </p>
+
+                <div class="hd-code-block" style="text-align: left; max-width: 700px; margin: 1.5rem auto;">
+                    <pre><code><span class="hd-code-comment">// In ext_localconf.php or Configuration/system/settings.php</span>
+<span class="hd-code-variable">$GLOBALS</span>[<span class="hd-code-string">'TYPO3_CONF_VARS'</span>][<span class="hd-code-string">'documentation'</span>] = [
+    <span class="hd-code-string">'readme'</span> => [
+        <span class="hd-code-string">'label'</span> => <span class="hd-code-string">'Project README'</span>,
+        <span class="hd-code-string">'path'</span> => <span class="hd-code-string">'EXT:your_ext/Documentation/README.md'</span>,
+    ],
+];</code></pre>
+                </div>
+            </div>
+        </f:else>
+    </f:if>
 </f:section>
+</html>

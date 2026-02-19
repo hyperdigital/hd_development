@@ -11,7 +11,6 @@ use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Resource\DuplicationBehavior;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Utility\DebuggerUtility;
 
 class StyleguideService
 {
@@ -21,13 +20,13 @@ class StyleguideService
             ->get('hd_development', 'styleguideSource');
         $targets = GeneralUtility::trimExplode(',', GeneralUtility::makeInstance(ExtensionConfiguration::class)
             ->get('hd_development', 'styleguides'));
+        $styleguides = [];
         if (!empty($source)) {
             $path = GeneralUtility::getFileAbsFileName($source);
             if (file_exists($path)) {
                 if (is_file($path)) {
                     $styleguides = include($path);
                 } else {
-                    $styleguides = [];
                     foreach(scandir($path) as $filepath) {
                         if (is_file($path . DIRECTORY_SEPARATOR . $filepath)) {
                             $styleguides = array_merge_recursive($styleguides, include($path . DIRECTORY_SEPARATOR . $filepath));
@@ -37,23 +36,29 @@ class StyleguideService
             }
         }
 
-        if ($targets && $styleguides) {
+        if ($targets && !empty($styleguides)) {
             $pageRepository = GeneralUtility::makeInstance(PageRepository::class);
             foreach ($targets as $target) {
                 $target = (int) $target;
                 $parentPage = $pageRepository->getPage($target, true);
-                $i = 0;
+                $pageSorting = 0;
                 foreach ($styleguides as $pageKey => $pageData) {
-                    $i++;
-                    $page = $this->getTestinPage($target, $pageKey);
+                    $pageSorting += 256;
+                    $page = $this->getTestingPage($target, $pageKey);
                     if (!$page) {
-                        $page = $this->createTestingPage($target, $pageKey, $pageData, $parentPage, $i);
+                        $page = $this->createTestingPage($target, $pageKey, $pageData, $parentPage, $pageSorting);
                     } else {
-                        $page = $this->updateTestingPage($page['uid'], $pageKey, $pageData, $i);
+                        $page = $this->updateTestingPage($page['uid'], $pageKey, $pageData, $pageSorting);
                     }
 
                     if (!empty($pageData['elements'])) {
+                        $elementSorting = 0;
                         foreach ($pageData['elements'] as $elementKey => $elementData) {
+                            // Use sorting from definition if available, otherwise auto-increment
+                            if (!isset($elementData['sorting'])) {
+                                $elementSorting += 256;
+                                $elementData['sorting'] = $elementSorting;
+                            }
                             $element = $this->getTestingElement($page['uid'], $elementKey);
                             if (!$element) {
                                 $element = $this->createTestingElement($page['uid'], $elementKey, $elementData);
@@ -67,7 +72,7 @@ class StyleguideService
         }
     }
 
-    protected function getTestinPage($target, $pageKey)
+    protected function getTestingPage($target, $pageKey)
     {
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getQueryBuilderForTable('pages');
@@ -88,7 +93,7 @@ class StyleguideService
         return $page;
     }
 
-    protected function createTestingPage($target, $pageKey, $pageData, $parentPage, $i)
+    protected function createTestingPage($target, $pageKey, $pageData, $parentPage, $sorting)
     {
         $values = [
             'pid' => $target,
@@ -96,7 +101,7 @@ class StyleguideService
             'hd_dev_styleguide' => $pageKey,
             'hidden' => 1,
             'slug' => $parentPage['slug'].'/'.$pageKey,
-            'sorting' => $i
+            'sorting' => $sorting
         ];
 
         foreach ($pageData as $dataKey => $dataValue) {
@@ -131,9 +136,9 @@ class StyleguideService
         return $page;
     }
 
-    protected function updateTestingPage($target, $pageKey, $pageData, $i)
+    protected function updateTestingPage($target, $pageKey, $pageData, $sorting)
     {
-        $values = ['sorting' => $i, 'doktype' => 1];
+        $values = ['sorting' => $sorting, 'doktype' => 1];
 
         foreach ($pageData as $dataKey => $dataValue) {
             if (in_array($dataKey, ['elements'])){
@@ -200,9 +205,7 @@ class StyleguideService
 
         $images = [];
         $replacements = [];
-        
         $relatedTables = [];
-        $fileReferences = [];
 
 
         foreach ($pageData as $dataKey => $dataValue) {
@@ -222,18 +225,18 @@ class StyleguideService
                 if (!empty($GLOBALS['TCA']['tt_content']['columns'][$dataKey])) {
                     switch ($GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['type']) {
                         case 'inline':
-                            $forignTable = $GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['foreign_table'];
+                            $foreignTable = $GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['foreign_table'];
                             $foreignField = $GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['foreign_field'];
 
                             foreach ($dataValue as $inlineValues) {
-                                if (empty($relatedTables[$forignTable])) {
-                                    $relatedTables[$forignTable] = [
+                                if (empty($relatedTables[$foreignTable])) {
+                                    $relatedTables[$foreignTable] = [
                                         'foreignField' => $foreignField,
                                         'data' => []
                                     ];
                                 }
 
-                                $relatedTables[$forignTable]['data'][] = $inlineValues;
+                                $relatedTables[$foreignTable]['data'][] = $inlineValues;
                             }
 
                             $values[$dataKey] = count($dataValue);
@@ -253,7 +256,7 @@ class StyleguideService
                                  * ###VIDEO###
                                  */
                                 $inlineValues['uid_local'] = $this->findFileByType($inlineValues['uid_local']);
-                                if (!$inlineValues['uid_local'] ) {
+                                if (!$inlineValues['uid_local']) {
                                     continue;
                                 }
                                 $relatedTables['sys_file_reference']['data'][] = $inlineValues;
@@ -268,20 +271,19 @@ class StyleguideService
             }
         }
 
-
         foreach ($replacements as $column => $replacement) {
             foreach ($replacement as $search => $replace) {
                 $values[$column] = str_replace($search, $replace, $values[$column]);
             }
         }
 
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+        $insertQueryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getQueryBuilderForTable('tt_content');
 
-        $queryBuilder->insert('tt_content')
+        $insertQueryBuilder->insert('tt_content')
             ->values($values)
             ->executeStatement();
-        $newUid = $queryBuilder->getConnection()->lastInsertId();
+        $newUid = $insertQueryBuilder->getConnection()->lastInsertId();
 
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getQueryBuilderForTable('tt_content');
@@ -329,18 +331,18 @@ class StyleguideService
                 if (!empty($GLOBALS['TCA']['tt_content']['columns'][$dataKey])) {
                     switch ($GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['type']) {
                         case 'inline':
-                            $forignTable = $GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['foreign_table'];
+                            $foreignTable = $GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['foreign_table'];
                             $foreignField = $GLOBALS['TCA']['tt_content']['columns'][$dataKey]['config']['foreign_field'];
 
                             foreach ($dataValue as $inlineValues) {
-                                if (empty($relatedTables[$forignTable])) {
-                                    $relatedTables[$forignTable] = [
+                                if (empty($relatedTables[$foreignTable])) {
+                                    $relatedTables[$foreignTable] = [
                                         'foreignField' => $foreignField,
                                         'data' => []
                                     ];
                                 }
 
-                                $relatedTables[$forignTable]['data'][] = $inlineValues;
+                                $relatedTables[$foreignTable]['data'][] = $inlineValues;
                             }
 
                             $values[$dataKey] = count($dataValue);
@@ -360,7 +362,7 @@ class StyleguideService
                                  * ###VIDEO###
                                  */
                                 $inlineValues['uid_local'] = $this->findFileByType($inlineValues['uid_local']);
-                                if (!$inlineValues['uid_local'] ) {
+                                if (!$inlineValues['uid_local']) {
                                     continue;
                                 }
                                 $relatedTables['sys_file_reference']['data'][] = $inlineValues;
@@ -374,7 +376,6 @@ class StyleguideService
                 $values[$dataKey] = $dataValue;
             }
         }
-
 
         foreach ($replacements as $column => $replacement) {
             foreach ($replacement as $search => $replace) {
@@ -424,14 +425,14 @@ class StyleguideService
     protected function generateRelatedTables($relatedTables, $parentElement)
     {
         foreach ($relatedTables as $table => $rows) {
-            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+            $selectQueryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
                 ->getQueryBuilderForTable($table);
 
-            $existingElements = $queryBuilder
+            $existingElements = $selectQueryBuilder
                 ->select('*')
                 ->from($table)
                 ->where(
-                    $queryBuilder->expr()->eq($rows['foreignField'], $queryBuilder->createNamedParameter((int)$parentElement['uid'], Types::INTEGER))
+                    $selectQueryBuilder->expr()->eq($rows['foreignField'], $selectQueryBuilder->createNamedParameter((int)$parentElement['uid'], Types::INTEGER))
                 )
                 ->executeQuery()
                 ->fetchAllAssociative();
@@ -449,7 +450,9 @@ class StyleguideService
                 $values['pid'] = $parentElement['pid'];
 
                 if (!$existingElements) {
-                    $queryBuilder->insert($table)
+                    $insertQueryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+                        ->getQueryBuilderForTable($table);
+                    $insertQueryBuilder->insert($table)
                         ->values($values)
                         ->executeStatement();
                 } else {
@@ -458,19 +461,20 @@ class StyleguideService
             }
 
             if ($updates) {
-                // TODO: UPdate existing stuff if needed
-                
                 for ($i = 0; $i < count($existingElements); $i++) {
+                    $updateQueryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+                        ->getQueryBuilderForTable($table);
+
                     if (empty($updates[$i])) {
-                        $queryBuilder->update($table);
+                        $query = $updateQueryBuilder->update($table);
                         $query = $query->set('deleted', 1);
                         $query = $query->set('hidden', 1);
                         $query->where(
-                            $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($existingElements[$i]['uid'], Types::INTEGER))
+                            $updateQueryBuilder->expr()->eq('uid', $updateQueryBuilder->createNamedParameter($existingElements[$i]['uid'], Types::INTEGER))
                         );
                         $query->executeStatement();
                     } else {
-                        $query = $queryBuilder->update($table);
+                        $query = $updateQueryBuilder->update($table);
                         foreach ($updates[$i] as $key => $value) {
                             if ($key == 'hd_dev_styleguide') {
                                 continue;
@@ -478,7 +482,7 @@ class StyleguideService
                             $query = $query->set($key, $value);
                         }
                         $query->where(
-                            $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($existingElements[$i]['uid'], Types::INTEGER))
+                            $updateQueryBuilder->expr()->eq('uid', $updateQueryBuilder->createNamedParameter($existingElements[$i]['uid'], Types::INTEGER))
                         );
                         $query->executeStatement();
 
@@ -488,7 +492,9 @@ class StyleguideService
 
                 if (!empty($updates)) {
                     foreach ($updates as $values) {
-                        $queryBuilder->insert($table)
+                        $insertQueryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+                            ->getQueryBuilderForTable($table);
+                        $insertQueryBuilder->insert($table)
                             ->values($values)
                             ->executeStatement();
                     }
@@ -675,8 +681,12 @@ class StyleguideService
                         ]
                     );
                 } catch (\Exception $e) {
-                    var_dump($e);
-                    die('xxxx');
+                    \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\Psr\Log\LoggerInterface::class)
+                        ->error('Failed to insert sys_file_reference', [
+                            'exception' => $e->getMessage(),
+                            'uid_local' => $uidLocal,
+                            'uid_foreign' => $element['uid'],
+                        ]);
                 }
             }
         }

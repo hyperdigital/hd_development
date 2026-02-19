@@ -1,35 +1,94 @@
 <html
-        xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
-        xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
-        xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
-        data-namespace-typo3-fluid="true">
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+    xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+    data-namespace-typo3-fluid="true">
 <f:layout name="Module" />
 
 <f:section name="Content">
+    <f:asset.css identifier="hd-backend-styles" href="EXT:hd_development/Resources/Public/css/backend.css" />
+
+    <div class="hd-module-header">
+        <h1>Styleguide Manager</h1>
+        <p class="hd-subtitle">Manage and synchronize your content element styleguides</p>
+    </div>
+
     <f:if condition="{styleguides}">
         <f:then>
-            <h1>Styleguides</h1>
-            <f:link.action action="runSync" class="btn btn-default">Run Sync</f:link.action>
+            <div class="hd-stats-grid">
+                <div class="hd-stat-card hd-stat-blue">
+                    <p class="hd-stat-value">{styleguides -> f:count()}</p>
+                    <p class="hd-stat-label">Styleguide Pages</p>
+                </div>
+            </div>
+
+            <div class="hd-action-bar">
+                <f:link.action action="runSync" class="btn btn-hd-primary">
+                    <core:icon identifier="actions-refresh" size="small" /> Sync Styleguides
+                </f:link.action>
+                <f:link.action action="getSettingsIndex" class="btn btn-hd-secondary">
+                    <core:icon identifier="actions-cog" size="small" /> Export Settings
+                </f:link.action>
+            </div>
+
+            <div class="hd-panel">
+                <div class="hd-panel-header">
+                    <h2 class="hd-panel-title">Available Styleguides</h2>
+                </div>
+                <div class="hd-panel-body">
+                    <div class="hd-styleguide-list">
+                        <f:for each="{styleguides}" key="key" as="styleguide">
+                            <div class="hd-styleguide-item">
+                                <div class="hd-styleguide-item-icon">
+                                    <core:icon identifier="content-text" size="small" />
+                                </div>
+                                <div class="hd-styleguide-item-content">
+                                    <p class="hd-styleguide-item-title">{styleguide.title}</p>
+                                    <p class="hd-styleguide-item-meta">
+                                        Key: {key}
+                                        <f:if condition="{styleguide.elements}">
+                                             | {styleguide.elements -> f:count()} elements
+                                        </f:if>
+                                    </p>
+                                </div>
+                            </div>
+                        </f:for>
+                    </div>
+                </div>
+            </div>
         </f:then>
         <f:else>
-            <h1>Styleguides</h1>
-            <p>You don't have set any styleguide element yet. Create your import file like that:</p>
-            <f:spaceless>
-                <pre>return [
-                  'textpic' => [ // This is one complete page with testing elements
-                      'title' => 'Text&Pic', // Required
-                      'icon' => 'EXT:hd_development/Resources/Public/Icons/styleguide-icon.svg',
-                      'elements' => [
-                        'textpic_img_left' => [ // Database fields
-                          'header' => 'Text&Pic with image left',
-                          'cType' => 'textpic'
-                        ]
-                      ]
-                    ]
-                ];</pre>
-            </f:spaceless>
+            <div class="hd-empty-state">
+                <div class="hd-empty-state-icon">
+                    <core:icon identifier="apps-pagetree-folder-default" size="large" />
+                </div>
+                <h2 class="hd-empty-state-title">No Styleguides Configured</h2>
+                <p class="hd-empty-state-text">
+                    Create a PHP configuration file to define your styleguide elements.
+                    Set the path in Extension Configuration under "styleguideSource".
+                </p>
+
+                <div class="hd-code-block" style="text-align: left; max-width: 600px; margin: 1.5rem auto;">
+                    <pre><code><span class="hd-code-keyword">return</span> [
+    <span class="hd-code-string">'textpic'</span> => [
+        <span class="hd-code-string">'title'</span> => <span class="hd-code-string">'Text &amp; Image'</span>,
+        <span class="hd-code-string">'elements'</span> => [
+            <span class="hd-code-string">'textpic_left'</span> => [
+                <span class="hd-code-string">'header'</span> => <span class="hd-code-string">'Image Left'</span>,
+                <span class="hd-code-string">'CType'</span> => <span class="hd-code-string">'textpic'</span>,
+            ],
+        ],
+    ],
+];</code></pre>
+                </div>
+            </div>
+
+            <div class="hd-action-bar" style="justify-content: center; margin-top: 2rem;">
+                <f:link.action action="getSettingsIndex" class="btn btn-hd-secondary">
+                    <core:icon identifier="actions-cog" size="small" /> Export Existing Content
+                </f:link.action>
+            </div>
         </f:else>
     </f:if>
-
-    <f:link.action action="getSettingsIndex" class="btn btn-default">Get settings</f:link.action>
 </f:section>
+</html>

@@ -56,7 +56,8 @@ class DocumentationController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionCo
         if (!empty($GLOBALS['TYPO3_CONF_VARS']['documentation'])) {
             $moduleTemplate->assign('documentations', $documentations);
         } else {
-            die('todo: Missing paths');
+            $moduleTemplate->assign('documentations', []);
+            $moduleTemplate->assign('error', 'No documentation paths configured in $GLOBALS[\'TYPO3_CONF_VARS\'][\'documentation\']');
         }
 
         return $moduleTemplate->renderResponse('Be/Documentation/Index');
@@ -97,10 +98,10 @@ class DocumentationController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionCo
                 $this->fixRelativeLinks($parsedTexts, dirname($path), $documentationKey.''); // maybe would need separated parts
                 $moduleTemplate->assign('content',  $parsedTexts);
             } else {
-                die('todo: Missing documentation');
+                $moduleTemplate->assign('error', 'Documentation file not found: ' . $path);
             }
         } else {
-            die('todo: Missing documentation');
+            $moduleTemplate->assign('error', 'Documentation configuration missing or invalid for key: ' . $documentationKey);
         }
 
         return $moduleTemplate->renderResponse('Be/Documentation/Documentation');

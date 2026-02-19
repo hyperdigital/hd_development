@@ -30,9 +30,12 @@ class TemplatesController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContro
 
         $result = $queryBuilder->executeQuery();
 
+        $rows = [];
         while ($row = $result->fetchAssociative()) {
-            var_dump($row);
+            $rows[] = $row;
         }
-        die('hello world');
+
+        $this->view->assign('rows', $rows);
+        return $this->htmlResponse();
     }
 }

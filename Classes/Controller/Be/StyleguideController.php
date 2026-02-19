@@ -169,10 +169,9 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
         return $moduleTemplate->renderResponse('Be/Styleguide/SettingsPage');
     }
 
-    protected function pretty_var($myArray){
-
-        return str_replace(array("\n"," "),array("<br>","&nbsp;"), htmlentities(var_export($myArray,true)));
-
+    protected function pretty_var($myArray)
+    {
+        return var_export($myArray, true);
     }
     
     protected function getRecursiveValue($tablename, $fieldname, $value, $row)

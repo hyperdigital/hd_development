@@ -1,40 +1,49 @@
-.documentation h1{
-	font-weight: 600;
-	border-bottom: 1px solid #aaa;
-	font-size: 1.75rem !important;
-	letter-spacing: -0.01em;
-	line-height: 1.25;
-	padding-bottom: 0.75rem;
+/*
+ * Documentation styles are now included in backend.css
+ * This file is kept for backwards compatibility
+ * Use: EXT:hd_development/Resources/Public/css/backend.css
+ */
+
+/* Legacy support - minimal documentation styles */
+.documentation h1 {
+    font-weight: 700;
+    font-size: 2rem;
+    border-bottom: 2px solid #538bb3;
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
 }
 
-.documentation h2{
-	font-weight: 500;
-	font-size: 1.3125rem;
-	letter-spacing: -0.01em;
-	line-height: 1.25;
-	padding-bottom: 0.75rem;
-	border-bottom: 1px solid #ccc;
-}
-.documentation h3{
-	font-weight: 500;
-	font-size: 1.125rem;
-	letter-spacing: inherit;
-	line-height: 1.25;
-	padding-bottom: 0.75rem;
-}
-.documentation h4{
-	font-weight: 500;
-	font-size: 0.75rem;
-	letter-spacing: inherit;
-	line-height: 1.25;
-	padding-bottom: 1rem;
+.documentation h2 {
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
 }
 
-.documentation p{
-	margin: 0;
-	padding-bottom: 1rem;
-	line-height: 1.75;
+.documentation h3 {
+    font-weight: 600;
+    font-size: 1.25rem;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
 }
-.documentation img{
-	max-width: 100%;
+
+.documentation h4 {
+    font-weight: 600;
+    font-size: 1rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.documentation p {
+    margin: 0 0 1rem 0;
+    line-height: 1.75;
+}
+
+.documentation img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }

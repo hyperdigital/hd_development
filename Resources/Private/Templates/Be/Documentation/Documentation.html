@@ -1,17 +1,29 @@
 <html
-		xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
-		xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
-		xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
-		data-namespace-typo3-fluid="true">
+    xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+    xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+    xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers"
+    data-namespace-typo3-fluid="true">
 <f:layout name="Module" />
 
 <f:section name="Content">
-<f:asset.css identifier="hddocumentation-documentation" href="EXT:hd_development/Resources/Public/css/documentation.css"></f:asset.css>
+    <f:asset.css identifier="hd-backend-styles" href="EXT:hd_development/Resources/Public/css/backend.css" />
 
-<f:if condition="{content}">
-	<div class="documentation">
-		{content -> f:format.raw()}
-	</div>
-</f:if>
+    <f:if condition="{error}">
+        <div class="hd-alert hd-alert-danger">
+            <div class="hd-alert-icon">
+                <core:icon identifier="actions-exclamation-circle" size="small" />
+            </div>
+            <div class="hd-alert-content">
+                <p class="hd-alert-title">Error</p>
+                <p class="hd-alert-text">{error}</p>
+            </div>
+        </div>
+    </f:if>
+
+    <f:if condition="{content}">
+        <div class="documentation">
+            {content -> f:format.raw()}
+        </div>
+    </f:if>
 </f:section>
 </html>
