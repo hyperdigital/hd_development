@@ -437,12 +437,20 @@ class StyleguideService
                 ->executeQuery()
                 ->fetchAllAssociative();
             $updates = [];
+            $nestedFileFields = [];
+            $rowIndex = 0;
 
             foreach ($rows['data'] as $row) {
                 $values = [];
+                $nestedFileFields[$rowIndex] = [];
+
                 foreach ($row as $key => $value) {
                     if ($key == $rows['foreignField']) {
                         $values[$key] = $parentElement['uid'];
+                    } elseif (is_array($value) && $this->isNestedFileField($table, $key, $value)) {
+                        // Store nested file field data for later processing
+                        $nestedFileFields[$rowIndex][$key] = $value;
+                        $values[$key] = count($value);
                     } else {
                         $values[$key] = $value;
                     }
@@ -455,9 +463,19 @@ class StyleguideService
                     $insertQueryBuilder->insert($table)
                         ->values($values)
                         ->executeStatement();
+                    $newUid = (int)$insertQueryBuilder->getConnection()->lastInsertId();
+
+                    // Process nested file fields for this new record
+                    if (!empty($nestedFileFields[$rowIndex])) {
+                        $this->processNestedFileFields($nestedFileFields[$rowIndex], $newUid, $table, $parentElement['pid']);
+                    }
                 } else {
-                    $updates[] = $values;
+                    $updates[] = [
+                        'values' => $values,
+                        'nestedFiles' => $nestedFileFields[$rowIndex],
+                    ];
                 }
+                $rowIndex++;
             }
 
             if ($updates) {
@@ -475,7 +493,7 @@ class StyleguideService
                         $query->executeStatement();
                     } else {
                         $query = $updateQueryBuilder->update($table);
-                        foreach ($updates[$i] as $key => $value) {
+                        foreach ($updates[$i]['values'] as $key => $value) {
                             if ($key == 'hd_dev_styleguide') {
                                 continue;
                             }
@@ -486,19 +504,117 @@ class StyleguideService
                         );
                         $query->executeStatement();
 
+                        // Process nested file fields for existing record
+                        if (!empty($updates[$i]['nestedFiles'])) {
+                            $this->processNestedFileFields($updates[$i]['nestedFiles'], $existingElements[$i]['uid'], $table, $parentElement['pid']);
+                        }
+
                         unset($updates[$i]);
                     }
                 }
 
                 if (!empty($updates)) {
-                    foreach ($updates as $values) {
+                    foreach ($updates as $updateData) {
                         $insertQueryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
                             ->getQueryBuilderForTable($table);
                         $insertQueryBuilder->insert($table)
-                            ->values($values)
+                            ->values($updateData['values'])
                             ->executeStatement();
+                        $newUid = (int)$insertQueryBuilder->getConnection()->lastInsertId();
+
+                        // Process nested file fields for this new record
+                        if (!empty($updateData['nestedFiles'])) {
+                            $this->processNestedFileFields($updateData['nestedFiles'], $newUid, $table, $parentElement['pid']);
+                        }
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Check if a field contains nested file reference data
+     */
+    protected function isNestedFileField(string $table, string $fieldName, array $value): bool
+    {
+        // Check TCA config
+        $tcaType = $GLOBALS['TCA'][$table]['columns'][$fieldName]['config']['type'] ?? null;
+        if ($tcaType === 'file') {
+            return true;
+        }
+
+        // Fallback: check if array structure looks like file references
+        if (isset($value[0]) && is_array($value[0]) && isset($value[0]['uid_local'])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Process nested file fields and create sys_file_reference records
+     */
+    protected function processNestedFileFields(array $nestedFileFields, int $foreignUid, string $tableName, int $pid): void
+    {
+        foreach ($nestedFileFields as $fieldName => $fileReferences) {
+            $connection = GeneralUtility::makeInstance(ConnectionPool::class)
+                ->getConnectionForTable('sys_file_reference');
+
+            // Delete existing references for this field to ensure clean state
+            $connection->delete(
+                'sys_file_reference',
+                [
+                    'uid_foreign' => $foreignUid,
+                    'tablenames' => $tableName,
+                    'fieldname' => $fieldName,
+                ]
+            );
+
+            $sorting = 0;
+            foreach ($fileReferences as $fileRef) {
+                $uidLocal = $this->findFileByType($fileRef['uid_local'] ?? '');
+                if (!$uidLocal) {
+                    $sorting++;
+                    continue;
+                }
+
+                // Insert new reference
+                $refData = [
+                    'uid_local' => $uidLocal,
+                    'uid_foreign' => $foreignUid,
+                    'tablenames' => $tableName,
+                    'fieldname' => $fieldName,
+                    'pid' => $pid,
+                    'crdate' => time(),
+                    'tstamp' => time(),
+                    'sorting_foreign' => $sorting,
+                ];
+
+                // Copy additional fields from the reference data
+                $allowedFields = ['title', 'alternative', 'description', 'link', 'crop',
+                    'hd_loading', 'hd_background_size', 'hd_background_position', 'hd_background_attachment',
+                    'hd_parallax_on', 'hd_parallax_speed', 'hd_video_autoplay', 'hd_video_muted',
+                    'hd_video_loop', 'hd_video_controls', 'hd_video_play_on_hover', 'hd_video_orientation'];
+
+                foreach ($allowedFields as $field) {
+                    if (isset($fileRef[$field]) && $fileRef[$field] !== null) {
+                        $refData[$field] = $fileRef[$field];
+                    }
+                }
+
+                try {
+                    $connection->insert('sys_file_reference', $refData);
+                } catch (\Exception $e) {
+                    GeneralUtility::makeInstance(\Psr\Log\LoggerInterface::class)
+                        ->error('Failed to insert nested sys_file_reference', [
+                            'exception' => $e->getMessage(),
+                            'uid_local' => $uidLocal,
+                            'uid_foreign' => $foreignUid,
+                            'table' => $tableName,
+                            'field' => $fieldName,
+                        ]);
+                }
+                $sorting++;
             }
         }
     }
