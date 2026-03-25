@@ -425,9 +425,9 @@ class StyleguideService
     protected function generateRelatedTables($relatedTables, $parentElement, $parentTable = 'tt_content')
     {
         foreach ($relatedTables as $table => $rows) {
-            // Skip sys_file_reference - it's handled separately by generateImages method
-            // and needs special fieldname/tablenames filtering that this method doesn't provide
+            // Handle sys_file_reference separately - create file references for the parent element
             if ($table === 'sys_file_reference') {
+                $this->createFileReferencesForParentElement($rows['data'], $parentElement, $parentTable);
                 continue;
             }
 
@@ -620,6 +620,75 @@ class StyleguideService
                     $connection->insert('sys_file_reference', $insertData);
                 } catch (\Exception $e) {
                     error_log('StyleguideService: Failed to insert sys_file_reference for inline record: ' . $e->getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Create file references for a parent element (like tt_content)
+     * This handles TCA 'file' type fields directly on the parent table
+     */
+    protected function createFileReferencesForParentElement(array $fileReferences, array $parentElement, string $parentTable = 'tt_content'): void
+    {
+        $connection = GeneralUtility::makeInstance(ConnectionPool::class)
+            ->getConnectionForTable('sys_file_reference');
+
+        foreach ($fileReferences as $fileData) {
+            $uidLocal = $fileData['uid_local'];
+            $fieldname = $fileData['fieldname'] ?? '';
+            $tablenames = $fileData['tablenames'] ?? $parentTable;
+
+            if (!$uidLocal || !$fieldname) {
+                continue;
+            }
+
+            // Check if reference already exists
+            $existingReference = $connection->select(
+                ['uid'],
+                'sys_file_reference',
+                [
+                    'uid_local' => $uidLocal,
+                    'uid_foreign' => $parentElement['uid'],
+                    'tablenames' => $tablenames,
+                    'fieldname' => $fieldname,
+                    'deleted' => 0
+                ]
+            )->fetchOne();
+
+            if (!$existingReference) {
+                $insertData = [
+                    'pid' => $parentElement['pid'],
+                    'uid_local' => $uidLocal,
+                    'uid_foreign' => $parentElement['uid'],
+                    'tablenames' => $tablenames,
+                    'fieldname' => $fieldname,
+                    'crdate' => time(),
+                    'tstamp' => time(),
+                    'sorting_foreign' => $fileData['sorting_foreign'] ?? 0,
+                ];
+
+                // Add optional fields from the file data
+                $optionalFields = [
+                    'title', 'alternative', 'description', 'link', 'crop', 'autoplay',
+                    'hd_loading', 'hd_background_fit', 'hd_background_repeat', 'hd_background_attachment',
+                    'hd_background_loading', 'hd_background_overlay', 'hd_mask', 'hd_video_poster',
+                    'hd_video_autoplay', 'hd_video_muted', 'hd_video_loop', 'hd_video_playsinline',
+                    'hd_video_controls', 'hd_video_subtitle_language_label', 'hd_video_subtitle_language',
+                    'hd_video_subtitles', 'hd_parallax_speed', 'hd_background_position',
+                    'hd_parallax_zoom', 'hd_video_orientation', 'hd_video_play_on_hover', 'showinpreview'
+                ];
+
+                foreach ($optionalFields as $field) {
+                    if (array_key_exists($field, $fileData) && $fileData[$field] !== null) {
+                        $insertData[$field] = $fileData[$field];
+                    }
+                }
+
+                try {
+                    $connection->insert('sys_file_reference', $insertData);
+                } catch (\Exception $e) {
+                    error_log('StyleguideService: Failed to insert sys_file_reference for parent element: ' . $e->getMessage());
                 }
             }
         }
