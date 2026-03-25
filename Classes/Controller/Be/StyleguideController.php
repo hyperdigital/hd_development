@@ -176,7 +176,7 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
     
     protected function getRecursiveValue($tablename, $fieldname, $value, $row)
     {
-        $type = $GLOBALS['TCA'][$tablename]['columns'][$fieldname]['config']['type'];
+        $type = $GLOBALS['TCA'][$tablename]['columns'][$fieldname]['config']['type'] ?? '';
 
         switch ($type) {
             case 'inline':
@@ -185,7 +185,7 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
                 break;
             case 'file':
                 $config = $GLOBALS['TCA'][$tablename]['columns'][$fieldname]['config'];
-                return $this->getFileData($row, $config, $fieldname, 'tt_content');
+                return $this->getFileData($row, $config, $fieldname, $tablename);
             default:
                 return $value;
         }
@@ -196,6 +196,9 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
         $foreignField = 'uid_foreign';
         $forignTable = 'sys_file_reference';
         $fileKey = 'uid_local';
+
+        // Fields that should always be exported even if not in TCA
+        $requiredFields = ['tablenames', 'fieldname', 'sorting_foreign'];
 
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getQueryBuilderForTable($forignTable);
@@ -209,12 +212,13 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
                 $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Types::INTEGER)),
                 $queryBuilder->expr()->eq('hidden', $queryBuilder->createNamedParameter(0, Types::INTEGER))
             )
+            ->orderBy('sorting_foreign')
             ->executeQuery()
             ->fetchAllAssociative();
         if (!$rows) {
             return 0;
         }
-        
+
         $newRows = [];
         foreach ($rows as $row) {
             $file = $this->fileRepository->findByUid($row[$fileKey]);
@@ -233,11 +237,11 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
                     $fileShortcut = false;
                     break;
             }
-            
+
             if (!$fileShortcut) {
                 continue;
             }
-                
+
             $newRow = [];
             foreach ($row as $key => $value) {
                 if (in_array($key, $this->ignoreTtContentFields)) {
@@ -248,7 +252,8 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
                 } else if ($key == $fileKey) {
                     $newRow[$key] = $fileShortcut;
                 } else if (!in_array($key, ['uid', 'pid'])) {
-                    if(!empty($GLOBALS['TCA'][$forignTable]['columns'][$key])) {
+                    // Include required fields and TCA fields
+                    if (in_array($key, $requiredFields) || !empty($GLOBALS['TCA'][$forignTable]['columns'][$key])) {
                         $newRow[$key] = $this->getRecursiveValue($forignTable, $key, $value, $row);
                     }
                 }
