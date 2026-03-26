@@ -575,7 +575,7 @@ class StyleguideService
             $fieldname = $fileData['fieldname'];
             $uidLocal = $fileData['uid_local'];
 
-            // Check if reference already exists
+            // Check if reference already exists (include sorting_foreign to allow multiple references to same file)
             $existingReference = $connection->select(
                 ['uid'],
                 'sys_file_reference',
@@ -584,6 +584,7 @@ class StyleguideService
                     'uid_foreign' => $uidForeign,
                     'tablenames' => $tablenames,
                     'fieldname' => $fieldname,
+                    'sorting_foreign' => $fileData['sorting_foreign'] ?? 0,
                     'deleted' => 0
                 ]
             )->fetchOne();
@@ -643,7 +644,7 @@ class StyleguideService
                 continue;
             }
 
-            // Check if reference already exists
+            // Check if reference already exists (include sorting_foreign to allow multiple references to same file)
             $existingReference = $connection->select(
                 ['uid'],
                 'sys_file_reference',
@@ -652,6 +653,7 @@ class StyleguideService
                     'uid_foreign' => $parentElement['uid'],
                     'tablenames' => $tablenames,
                     'fieldname' => $fieldname,
+                    'sorting_foreign' => $fileData['sorting_foreign'] ?? 0,
                     'deleted' => 0
                 ]
             )->fetchOne();
@@ -834,18 +836,21 @@ class StyleguideService
 
     protected function generateImages($images, $element)
     {
+        // uid_local => find or create sys_file from path $image['path'] where the path is e.g. EXT:hd_development/Resources/Public/Images/Desktop.png
+        // uid_foreign => $element['uid']
+        // tablenames => $image['tablenames']
+        // fieldname => $image['fieldname']
 
-// uid_local => find or create sys_file from path $image['path'] where the path is e.g. EXT:hd_development/Resources/Public/Images/Desktop.png
-// uid_foreign => $element['uid']
-// tablenames => $image['tablenames']
-// fieldname => $image['fieldname']
-
+        $sortingCounter = 0;
         foreach ($images as $image) {
-// Get the file object
+            $sortingCounter++;
+            $sortingForeign = $image['sorting_foreign'] ?? $sortingCounter;
+
+            // Get the file object
             $originalPath = $image['path'];
             $absolutePath = GeneralUtility::getFileAbsFileName($originalPath);
 
-// 1. Check if the file already exists in sys_file.hd_dev_styleguide
+            // 1. Check if the file already exists in sys_file.hd_dev_styleguide
             $connection = GeneralUtility::makeInstance(ConnectionPool::class)
                 ->getConnectionForTable('sys_file');
 
@@ -866,7 +871,7 @@ class StyleguideService
                 if (!$storage->getRootLevelFolder()->hasFolder('testingImages')) {
                     $storage->getRootLevelFolder()->createFolder('testingImages');
                 }
-                $fileObject = $storage->addFile($absolutePath, $storage->getRootLevelFolder()->getSubfolder('testingImages'), '', DuplicationBehavior::RENAME, false); // true = index if not indexed
+                $fileObject = $storage->addFile($absolutePath, $storage->getRootLevelFolder()->getSubfolder('testingImages'), '', DuplicationBehavior::RENAME, false);
                 $uidLocal = $fileObject->getUid();
 
                 // 3. Update hd_dev_styleguide field
@@ -880,6 +885,7 @@ class StyleguideService
             $connection = GeneralUtility::makeInstance(ConnectionPool::class)
                 ->getConnectionForTable('sys_file_reference');
 
+            // Check if reference already exists (include sorting_foreign to allow multiple references to same file)
             $existingReference = $connection->select(
                 ['uid'],
                 'sys_file_reference',
@@ -888,6 +894,7 @@ class StyleguideService
                     'uid_foreign' => $element['uid'],
                     'tablenames' => $image['tablenames'],
                     'fieldname' => $image['fieldname'],
+                    'sorting_foreign' => $sortingForeign,
                     'deleted' => 0
                 ]
             )->fetchOne();
@@ -903,7 +910,7 @@ class StyleguideService
                             'fieldname' => $image['fieldname'],
                             'crdate' => time(),
                             'tstamp' => time(),
-                            'sorting_foreign' => 0,
+                            'sorting_foreign' => $sortingForeign,
                         ]
                     );
                 } catch (\Exception $e) {
