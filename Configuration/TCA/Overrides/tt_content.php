@@ -3,31 +3,34 @@
 defined('TYPO3') or die();
 
 (static function (): void {
-    $signatureV13 = \TYPO3\CMS\Extbase\Utility\ExtensionUtility::registerPlugin(
+    $signature = \TYPO3\CMS\Extbase\Utility\ExtensionUtility::registerPlugin(
         'HdDevelopment',
         'ContentElement',
         'Development: Content Element',
+        '',
+        'plugins',
+        '',
+        'FILE:EXT:hd_development/Configuration/FlexForms/contentelement.xml'
     );
 
-    $version = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Information\Typo3Version::class);
-
-    if ($version->getMajorVersion() >= 13) {
-        $signature = $signatureV13;
-    } else {
-        $signature = 'hddevelopment_contentelement';
-    }
-
-    $GLOBALS['TCA']['tt_content']['types']['list']['subtypes_addlist'][$signature] = 'pi_flexform';
-
-    if ($version->getMajorVersion() >= 12) {
-        \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
-            $signature,
-            'FILE:EXT:hd_development/Configuration/FlexForms/contentelement.xml'
-        );
-    } else {
-        \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
-            $signature,
-            'FILE:EXT:hd_development/Configuration/FlexForms/contentelementV11.xml'
-        );
-    }
+    // Only modify showitem - preserve columnsOverrides set by registerPlugin() for FlexForm
+    $GLOBALS['TCA']['tt_content']['types'][$signature]['showitem'] = '
+        --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
+            --palette--;;general,
+            --palette--;;headers,
+            pi_flexform,
+        --div--;LLL:EXT:frontend/Resources/Private/Language/locallang_ttc.xlf:tabs.appearance,
+            --palette--;;frames,
+            --palette--;;appearanceLinks,
+        --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:language,
+            --palette--;;language,
+        --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:access,
+            --palette--;;hidden,
+            --palette--;;access,
+        --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:categories,
+            categories,
+        --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:notes,
+            rowDescription,
+        --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:extended,
+    ';
 })();

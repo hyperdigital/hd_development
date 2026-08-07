@@ -3,37 +3,27 @@ declare(strict_types=1);
 
 namespace Hyperdigital\HdDevelopment\Controller\Be;
 
-use TYPO3\CMS\Core\Database\Connection;
+use Doctrine\DBAL\Types\Types;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 
-class TemplatesController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionController
+class TemplatesController extends ActionController
 {
-    /**
-     * @var ConnectionPool
-     */
-    protected $connectionPool;
-
     public function indexAction()
     {
         $connectionPool = GeneralUtility::makeInstance(ConnectionPool::class);
         $queryBuilder = $connectionPool->getQueryBuilderForTable('tt_content');
-        $whereClause = [];
-        $whereClause[] = $queryBuilder->expr()->eq('CType', $queryBuilder->createNamedParameter('list', Connection::PARAM_STR));
-        $whereClause[] = $queryBuilder->expr()->eq('list_type', $queryBuilder->createNamedParameter('hddevelopment_contentelement', Connection::PARAM_STR));
-        
 
         $queryBuilder
             ->select('*')
             ->from('tt_content')
-            ->where(...$whereClause);
+            ->where(
+                $queryBuilder->expr()->eq('CType', $queryBuilder->createNamedParameter('list', Types::STRING)),
+                $queryBuilder->expr()->eq('list_type', $queryBuilder->createNamedParameter('hddevelopment_contentelement', Types::STRING))
+            );
 
-        $result = $queryBuilder->executeQuery();
-
-        $rows = [];
-        while ($row = $result->fetchAssociative()) {
-            $rows[] = $row;
-        }
+        $rows = $queryBuilder->executeQuery()->fetchAllAssociative();
 
         $this->view->assign('rows', $rows);
         return $this->htmlResponse();

@@ -6,8 +6,7 @@ mod.wizards.newContentElement.wizardItems {
         title = Development: Content Element
         description = Frontend file for developing a new content element
         tt_content_defValues {
-          CType = list
-          list_type =hddevelopment_contentelement
+          CType = hddevelopment_contentelement
         }
       }
     }

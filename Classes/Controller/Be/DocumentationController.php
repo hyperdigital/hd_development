@@ -5,40 +5,26 @@ namespace Hyperdigital\HdDevelopment\Controller\Be;
 
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
-use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\Environment;
-use TYPO3\CMS\Core\Database\Connection;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
-use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
-use TYPO3\CMS\Core\Localization\Locales;
-use TYPO3\CMS\Core\Service\FlexFormService;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Mvc\Routing\UriBuilder;
-use TYPO3\CMS\Extbase\Utility\DebuggerUtility;
-use TYPO3\CMS\Extensionmanager\Utility\ListUtility;
+use TYPO3\CMS\Core\Resource\Folder;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
 use TYPO3\CMS\Core\Resource\StorageRepository;
-use TYPO3\CMS\Core\Resource\Folder;
-use TYPO3\CMS\Core\Resource\Exception\FileExistsException;
-use TYPO3\CMS\Core\Resource\Exception\FileOperationException;
-use TYPO3\CMS\Core\Resource\Exception\InsufficientFileWritePermissionsException;
-use TYPO3\CMS\Core\Resource\Exception\InvalidFileNameException;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 
-class DocumentationController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionController
+class DocumentationController extends ActionController
 {
     protected $pageRepository;
     protected $moduleTemplateFactory;
     protected $moduleTemplate;
 
     public function __construct(
-        ModuleTemplateFactory  $moduleTemplateFactory
+        ModuleTemplateFactory $moduleTemplateFactory
     )
     {
         $this->moduleTemplateFactory = $moduleTemplateFactory;
-        $this->uriBuilder = GeneralUtility::makeInstance(\TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder::class);
     }
 
     public function initializeAction():void

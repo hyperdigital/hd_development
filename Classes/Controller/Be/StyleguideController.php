@@ -5,33 +5,15 @@ namespace Hyperdigital\HdDevelopment\Controller\Be;
 
 use Doctrine\DBAL\Types\Types;
 use Hyperdigital\HdDevelopment\Service\StyleguideService;
-use Smalot\PdfParser\Page;
-use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
-use TYPO3\CMS\Core\Core\Environment;
-use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Domain\Repository\PageRepository;
-use TYPO3\CMS\Core\Imaging\Icon;
-use TYPO3\CMS\Core\Imaging\IconFactory;
-use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
-use TYPO3\CMS\Core\Localization\Locales;
 use TYPO3\CMS\Core\Resource\FileRepository;
-use TYPO3\CMS\Core\Service\FlexFormService;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder;
-use TYPO3\CMS\Extbase\Utility\DebuggerUtility;
-use TYPO3\CMS\Extensionmanager\Utility\ListUtility;
-use TYPO3\CMS\Core\Resource\ResourceFactory;
-use TYPO3\CMS\Core\Resource\StorageRepository;
-use TYPO3\CMS\Core\Resource\Folder;
-use TYPO3\CMS\Core\Resource\Exception\FileExistsException;
-use TYPO3\CMS\Core\Resource\Exception\FileOperationException;
-use TYPO3\CMS\Core\Resource\Exception\InsufficientFileWritePermissionsException;
-use TYPO3\CMS\Core\Resource\Exception\InvalidFileNameException;
+use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 
-class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionController
+class StyleguideController extends ActionController
 {
     protected $pageRepository;
     protected $moduleTemplateFactory;
@@ -39,11 +21,11 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
     protected $fileRepository;
 
     protected $ignoreTtContentFields = [
-        'rowDescription', 'pid', 'tstamp', 'crdate', 'cruser_id', 'deleted', 'hidden', 'starttime', 'endtime',
+        'rowDescription', 'pid', 'tstamp', 'crdate', 'deleted', 'hidden', 'starttime', 'endtime',
         'fe_group', 'editlock', 'sys_language_uid', 'l18n_parent', 'l10n_source', 'l10n_state',
-        't3_origuid', 'l18n_diffsource', 't3ver_oid', 't3ver_id', 'l10n_state', 't3ver_label', 't3ver_wsid',
+        't3_origuid', 'l18n_diffsource', 't3ver_oid', 't3ver_id', 't3ver_label', 't3ver_wsid',
         't3ver_state', 't3ver_stage', 't3ver_count', 't3ver_tstamp', 't3ver_move_id', 'l10nmgr_language_restriction',
-        'l10n_cfg','hd_dev_styleguide', 'l10n_parent', 'l10n_diffsource'
+        'l10n_cfg', 'hd_dev_styleguide', 'l10n_parent', 'l10n_diffsource'
     ];
 
     public function __construct(
@@ -52,7 +34,6 @@ class StyleguideController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionContr
     )
     {
         $this->moduleTemplateFactory = $moduleTemplateFactory;
-        $this->uriBuilder = GeneralUtility::makeInstance(\TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder::class);
         $this->fileRepository = $fileRepository;
     }
 
