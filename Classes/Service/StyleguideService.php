@@ -8,8 +8,9 @@ use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
 use TYPO3\CMS\Core\Domain\Repository\PageRepository;
-use TYPO3\CMS\Core\Resource\DuplicationBehavior;
+use TYPO3\CMS\Core\Resource\Enum\DuplicationBehavior;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
+use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class StyleguideService
@@ -770,7 +771,7 @@ class StyleguideService
             $uidLocal = $existingFileUid;
         } else {
             // 2. Index the file into FAL
-            $storage = GeneralUtility::makeInstance(ResourceFactory::class)->getDefaultStorage();
+            $storage = GeneralUtility::makeInstance(StorageRepository::class)->getDefaultStorage();
             if (!$storage->getRootLevelFolder()->hasFolder('testingImages')) {
                 $storage->getRootLevelFolder()->createFolder('testingImages');
             }
@@ -812,7 +813,7 @@ class StyleguideService
                     $uidLocal = $existingFileUid;
                 } else {
                     // 2. Index the file into FAL
-                    $storage = GeneralUtility::makeInstance(ResourceFactory::class)->getDefaultStorage();
+                    $storage = GeneralUtility::makeInstance(StorageRepository::class)->getDefaultStorage();
                     if (!$storage->getRootLevelFolder()->hasFolder('testingImages')) {
                         $storage->getRootLevelFolder()->createFolder('testingImages');
                     }
@@ -867,7 +868,7 @@ class StyleguideService
                 $uidLocal = $existingFileUid;
             } else {
                 // 2. Index the file into FAL
-                $storage = GeneralUtility::makeInstance(ResourceFactory::class)->getDefaultStorage();
+                $storage = GeneralUtility::makeInstance(StorageRepository::class)->getDefaultStorage();
                 if (!$storage->getRootLevelFolder()->hasFolder('testingImages')) {
                     $storage->getRootLevelFolder()->createFolder('testingImages');
                 }
