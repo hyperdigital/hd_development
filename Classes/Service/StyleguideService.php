@@ -54,17 +54,27 @@ class StyleguideService
 
                     if (!empty($pageData['elements'])) {
                         $elementSorting = 0;
+                        // Uids of the elements created for this page so far, by their definition
+                        // key, so a later element can point at an earlier one - see resolveReferences().
+                        $elementUids = [];
                         foreach ($pageData['elements'] as $elementKey => $elementData) {
                             // Use sorting from definition if available, otherwise auto-increment
                             if (!isset($elementData['sorting'])) {
                                 $elementSorting += 256;
                                 $elementData['sorting'] = $elementSorting;
                             }
+                            $elementData = $this->resolveReferences($elementData, [
+                                '###PAGE###' => (int)$page['uid'],
+                                '###FOLDER###' => $target,
+                            ], $elementUids);
                             $element = $this->getTestingElement($page['uid'], $elementKey);
                             if (!$element) {
                                 $element = $this->createTestingElement($page['uid'], $elementKey, $elementData);
                             } else {
                                 $element = $this->updateTestingElement($element['uid'], $elementKey, $elementData);
+                            }
+                            if (!empty($element['uid'])) {
+                                $elementUids[$elementKey] = (int)$element['uid'];
                             }
                         }
                     }
@@ -174,6 +184,57 @@ class StyleguideService
             ->executeQuery()
             ->fetchAssociative();
         return $page;
+    }
+
+
+    /**
+     * Resolves the references a definition cannot know the value of until the sync runs.
+     *
+     *   ###PAGE###            the styleguide page this element is being created on
+     *   ###FOLDER###          the testing folder the pages are deployed into
+     *   ###ELEMENT:<key>###   the uid of an element created earlier on the same page
+     *
+     * Without these a definition can only describe elements that stand alone. A container needs
+     * every child to name it (tx_container_parent), and a "sitemap of selected pages" needs a page
+     * uid in its "pages" field - neither is knowable when the definition is written, so both were
+     * simply absent from the styleguide. An ###ELEMENT### that names a key which has not been
+     * created yet is left as it is rather than silently becoming 0: the definition lists elements
+     * in order, so a forward reference is a mistake worth seeing.
+     *
+     * @param array<string, mixed> $elementData
+     * @param array<string, int> $constants
+     * @param array<string, int> $elementUids uid per element key, for this page, so far
+     * @return array<string, mixed>
+     */
+    protected function resolveReferences(array $elementData, array $constants, array $elementUids): array
+    {
+        foreach ($elementData as $field => $value) {
+            if (is_array($value)) {
+                $elementData[$field] = $this->resolveReferences($value, $constants, $elementUids);
+                continue;
+            }
+            if (!is_string($value) || !str_contains($value, '###')) {
+                continue;
+            }
+
+            foreach ($constants as $token => $uid) {
+                $value = str_replace($token, (string)$uid, $value);
+            }
+
+            $value = preg_replace_callback(
+                '/###ELEMENT:([A-Za-z0-9_\-]+)###/',
+                static function (array $match) use ($elementUids): string {
+                    return isset($elementUids[$match[1]])
+                        ? (string)$elementUids[$match[1]]
+                        : $match[0];
+                },
+                $value
+            );
+
+            $elementData[$field] = $value;
+        }
+
+        return $elementData;
     }
 
     protected function getTestingElement($pid, $elementKey)
@@ -602,21 +663,8 @@ class StyleguideService
                     'sorting_foreign' => $fileData['sorting_foreign'] ?? 0,
                 ];
 
-                // Add optional fields from the file data
-                $optionalFields = [
-                    'title', 'alternative', 'description', 'link', 'crop', 'autoplay',
-                    'hd_loading', 'hd_background_fit', 'hd_background_repeat', 'hd_background_attachment',
-                    'hd_background_loading', 'hd_background_overlay', 'hd_mask', 'hd_video_poster',
-                    'hd_video_autoplay', 'hd_video_muted', 'hd_video_loop', 'hd_video_playsinline',
-                    'hd_video_controls', 'hd_video_subtitle_language_label', 'hd_video_subtitle_language',
-                    'hd_video_subtitles', 'hd_parallax_speed', 'hd_background_position'
-                ];
-
-                foreach ($optionalFields as $field) {
-                    if (array_key_exists($field, $fileData) && $fileData[$field] !== null) {
-                        $insertData[$field] = $fileData[$field];
-                    }
-                }
+                // Everything else the definition carries, as long as the column is really there.
+                $insertData += $this->pickExistingColumns('sys_file_reference', $fileData, $insertData);
 
                 try {
                     $connection->insert('sys_file_reference', $insertData);
@@ -671,22 +719,8 @@ class StyleguideService
                     'sorting_foreign' => $fileData['sorting_foreign'] ?? 0,
                 ];
 
-                // Add optional fields from the file data
-                $optionalFields = [
-                    'title', 'alternative', 'description', 'link', 'crop', 'autoplay',
-                    'hd_loading', 'hd_background_fit', 'hd_background_repeat', 'hd_background_attachment',
-                    'hd_background_loading', 'hd_background_overlay', 'hd_mask', 'hd_video_poster',
-                    'hd_video_autoplay', 'hd_video_muted', 'hd_video_loop', 'hd_video_playsinline',
-                    'hd_video_controls', 'hd_video_subtitle_language_label', 'hd_video_subtitle_language',
-                    'hd_video_subtitles', 'hd_parallax_speed', 'hd_background_position',
-                    'hd_parallax_zoom', 'hd_video_orientation', 'hd_video_play_on_hover', 'showinpreview'
-                ];
-
-                foreach ($optionalFields as $field) {
-                    if (array_key_exists($field, $fileData) && $fileData[$field] !== null) {
-                        $insertData[$field] = $fileData[$field];
-                    }
-                }
+                // Everything else the definition carries, as long as the column is really there.
+                $insertData += $this->pickExistingColumns('sys_file_reference', $fileData, $insertData);
 
                 try {
                     $connection->insert('sys_file_reference', $insertData);
@@ -920,5 +954,42 @@ class StyleguideService
                 }
             }
         }
+    }
+
+    /**
+     * Keeps only the values whose column actually exists in $table.
+     *
+     * The lists this replaced were hardcoded and had drifted apart, and they named fields that
+     * other extensions add - "showinpreview" comes with EXT:news. On an instance without that
+     * extension the INSERT failed on an unknown column and the whole file reference was dropped
+     * (the exception is caught and only reaches error_log), so one stray field cost a demo its
+     * image. Asking the schema means a definition can carry any field the instance really has.
+     *
+     * @param array<string, mixed> $data    values from the styleguide definition
+     * @param array<string, mixed> $already keys that are set explicitly and must not be overwritten
+     * @return array<string, mixed>
+     */
+    protected function pickExistingColumns(string $table, array $data, array $already = []): array
+    {
+        static $columns = [];
+
+        if (!isset($columns[$table])) {
+            $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable($table);
+            $columns[$table] = array_change_key_case(
+                $connection->createSchemaManager()->listTableColumns($table)
+            );
+        }
+
+        $values = [];
+        foreach ($data as $field => $value) {
+            if ($value === null || is_array($value) || isset($already[$field])) {
+                continue;
+            }
+            if (isset($columns[$table][strtolower($field)])) {
+                $values[$field] = $value;
+            }
+        }
+
+        return $values;
     }
 }
