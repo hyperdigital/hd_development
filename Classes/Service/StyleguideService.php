@@ -484,7 +484,12 @@ class StyleguideService
         return $element;
     }
 
-    protected function generateRelatedTables($relatedTables, $parentElement, $parentTable = 'tt_content')
+    /**
+     * Maximum nesting of collections inside collections (e.g. quiz question -> answers)
+     */
+    protected const MAX_COLLECTION_DEPTH = 5;
+
+    protected function generateRelatedTables($relatedTables, $parentElement, $parentTable = 'tt_content', int $depth = 0)
     {
         foreach ($relatedTables as $table => $rows) {
             // Handle sys_file_reference separately - create file references for the parent element
@@ -509,6 +514,8 @@ class StyleguideService
             foreach ($rows['data'] as $rowIndex => $row) {
                 $values = [];
                 $nestedFileReferences = [];
+                // Inline collections of this row (e.g. the answers of a quiz question), created once the row has a uid
+                $nestedTables = [];
 
                 foreach ($row as $key => $value) {
                     if ($key == $rows['foreignField']) {
@@ -534,10 +541,19 @@ class StyleguideService
                             $values[$key] = count($value);
                         } else {
                             // Check TCA for inline type
-                            $fieldType = $GLOBALS['TCA'][$table]['columns'][$key]['config']['type'] ?? '';
+                            $fieldConfig = $GLOBALS['TCA'][$table]['columns'][$key]['config'] ?? [];
+                            $fieldType = $fieldConfig['type'] ?? '';
                             if ($fieldType === 'inline' || $fieldType === 'file') {
                                 // Set count for inline/file fields
                                 $values[$key] = count($value);
+                            }
+                            if ($fieldType === 'inline' && !empty($fieldConfig['foreign_table']) && !empty($fieldConfig['foreign_field'])
+                                && $depth + 1 < self::MAX_COLLECTION_DEPTH
+                            ) {
+                                $nestedTables[$fieldConfig['foreign_table']] = [
+                                    'foreignField' => $fieldConfig['foreign_field'],
+                                    'data' => array_values(array_filter($value, 'is_array')),
+                                ];
                             }
                             // Skip other array types
                         }
@@ -559,8 +575,9 @@ class StyleguideService
                     if (!empty($nestedFileReferences)) {
                         $this->createFileReferencesForInlineRecord($nestedFileReferences, (int)$newInlineUid, $parentElement['pid'], $table);
                     }
+                    $this->generateNestedTables($nestedTables, (int)$newInlineUid, $parentElement, $table, $depth);
                 } else {
-                    $updates[] = ['values' => $values, 'fileReferences' => $nestedFileReferences];
+                    $updates[] = ['values' => $values, 'fileReferences' => $nestedFileReferences, 'nestedTables' => $nestedTables];
                 }
             }
 
@@ -598,6 +615,7 @@ class StyleguideService
                         if (!empty($fileReferences)) {
                             $this->createFileReferencesForInlineRecord($fileReferences, (int)$existingElements[$i]['uid'], $parentElement['pid'], $table);
                         }
+                        $this->generateNestedTables($updateData['nestedTables'] ?? [], (int)$existingElements[$i]['uid'], $parentElement, $table, $depth);
 
                         unset($updates[$i]);
                     }
@@ -619,10 +637,23 @@ class StyleguideService
                         if (!empty($fileReferences)) {
                             $this->createFileReferencesForInlineRecord($fileReferences, (int)$newInlineUid, $parentElement['pid'], $table);
                         }
+                        $this->generateNestedTables($updateData['nestedTables'] ?? [], (int)$newInlineUid, $parentElement, $table, $depth);
                     }
                 }
             }
         }
+    }
+
+    /**
+     * Creates or updates the collections of an inline record (collection inside a collection). The records get the
+     * pid of the content element, like the inline record itself.
+     */
+    protected function generateNestedTables(array $nestedTables, int $recordUid, array $parentElement, string $table, int $depth): void
+    {
+        if ($nestedTables === [] || $recordUid <= 0) {
+            return;
+        }
+        $this->generateRelatedTables($nestedTables, ['uid' => $recordUid, 'pid' => $parentElement['pid']], $table, $depth + 1);
     }
 
     /**
