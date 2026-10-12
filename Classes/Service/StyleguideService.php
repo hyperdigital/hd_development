@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Hyperdigital\HdDevelopment\Service;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Types\Types;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -664,9 +665,13 @@ class StyleguideService
         $connection = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getConnectionForTable('sys_file_reference');
 
+        // Which files each field is supposed to hold after this sync - see pruneStaleFileReferences().
+        $wanted = [];
+
         foreach ($fileReferences as $fileData) {
             $fieldname = $fileData['fieldname'];
             $uidLocal = $fileData['uid_local'];
+            $wanted[$fieldname][] = (int)$uidLocal;
 
             // Check if reference already exists (include sorting_foreign to allow multiple references to same file)
             $existingReference = $connection->select(
@@ -704,6 +709,10 @@ class StyleguideService
                 }
             }
         }
+
+        foreach ($wanted as $fieldname => $uidLocals) {
+            $this->pruneStaleFileReferences($uidLocals, $uidForeign, $tablenames, (string)$fieldname);
+        }
     }
 
     /**
@@ -715,6 +724,10 @@ class StyleguideService
         $connection = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getConnectionForTable('sys_file_reference');
 
+        // Which files each field is supposed to hold after this sync, so that the ones it used
+        // to hold can go - see pruneStaleFileReferences().
+        $wanted = [];
+
         foreach ($fileReferences as $fileData) {
             $uidLocal = $fileData['uid_local'];
             $fieldname = $fileData['fieldname'] ?? '';
@@ -723,6 +736,8 @@ class StyleguideService
             if (!$uidLocal || !$fieldname) {
                 continue;
             }
+
+            $wanted[$tablenames . '.' . $fieldname][] = (int)$uidLocal;
 
             // Check if reference already exists (include sorting_foreign to allow multiple references to same file)
             $existingReference = $connection->select(
@@ -760,6 +775,43 @@ class StyleguideService
                 }
             }
         }
+
+        foreach ($wanted as $key => $uidLocals) {
+            [$tablenames, $fieldname] = explode('.', $key, 2);
+            $this->pruneStaleFileReferences($uidLocals, (int)$parentElement['uid'], $tablenames, $fieldname);
+        }
+    }
+
+    /**
+     * Drops the references a field used to have and the definition no longer lists.
+     *
+     * Without this a changed file is added next to the old one rather than replacing it, because
+     * every lookup above matches on uid_local as well - the element then has two pictures in a
+     * field that takes one, and which of them the frontend picks is a matter of sorting. It is
+     * only noticeable once a styleguide definition is edited, which is exactly when it matters.
+     *
+     * A soft delete: these rows are generated, but the rest of this service only ever looks at
+     * deleted = 0, and TYPO3 would rather have the row than not.
+     *
+     * @param list<int> $keep uids of the files the field is supposed to hold
+     */
+    protected function pruneStaleFileReferences(array $keep, int $uidForeign, string $tablenames, string $fieldname): void
+    {
+        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+            ->getQueryBuilderForTable('sys_file_reference');
+
+        $queryBuilder
+            ->update('sys_file_reference')
+            ->set('deleted', 1)
+            ->set('tstamp', time())
+            ->where(
+                $queryBuilder->expr()->eq('uid_foreign', $queryBuilder->createNamedParameter($uidForeign, Types::INTEGER)),
+                $queryBuilder->expr()->eq('tablenames', $queryBuilder->createNamedParameter($tablenames)),
+                $queryBuilder->expr()->eq('fieldname', $queryBuilder->createNamedParameter($fieldname)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Types::INTEGER)),
+                $queryBuilder->expr()->notIn('uid_local', $queryBuilder->createNamedParameter($keep, ArrayParameterType::INTEGER))
+            )
+            ->executeStatement();
     }
 
     /**
@@ -785,9 +837,10 @@ class StyleguideService
 
         $uidLocal = $firstItem['uid_local'];
 
-        // Check if uid_local is a valid file placeholder or numeric UID
+        // Check if uid_local is a valid file placeholder, an EXT: path or a numeric UID
         return $uidLocal === '###IMAGE###'
             || $uidLocal === '###VIDEO###'
+            || (is_string($uidLocal) && str_starts_with($uidLocal, 'EXT:'))
             || is_numeric($uidLocal);
     }
 
@@ -795,6 +848,7 @@ class StyleguideService
      * Available types
      * ###IMAGE###
      * ###VIDEO###
+     * an EXT: path to a file of your own
      * or numeric file UID
      */
     protected function findFileByType($type)
@@ -812,13 +866,39 @@ class StyleguideService
                 $originalPath = 'EXT:hd_development/Resources/Public/Videos/dummy_video.mp4';
                 break;
             default:
-                $originalPath = false;
+                // Any other EXT: path is taken as given. A file inside a collection row can
+                // only be named here - 'sys_file_references' at element level never reaches it -
+                // and for most elements the two placeholders are the wrong file: a 360 degree
+                // panorama needs an equirectangular photograph, not a screenshot of a laptop.
+                $originalPath = (is_string($type) && str_starts_with($type, 'EXT:')) ? $type : false;
                 break;
         }
         if (!$originalPath) {
             return false;
         }
+
+        return $this->indexStyleguideFile($originalPath);
+    }
+
+    /**
+     * The uid of the sys_file for an EXT: path, indexing it into fileadmin/testingImages the
+     * first time it is asked for.
+     *
+     * The raw EXT: path is kept in sys_file.hd_dev_styleguide, which is both how the file is
+     * found again on the next sync and how it is told apart from files an editor uploaded.
+     *
+     * @return int|false false when there is no such file - which is worth saying out loud now
+     *                   that the paths come from a styleguide definition rather than from the
+     *                   two that are compiled in here
+     */
+    protected function indexStyleguideFile(string $originalPath)
+    {
         $absolutePath = GeneralUtility::getFileAbsFileName($originalPath);
+        if (!$absolutePath || !is_file($absolutePath)) {
+            error_log('StyleguideService: no such file: ' . $originalPath);
+
+            return false;
+        }
 
         $connection = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getConnectionForTable('sys_file');
@@ -833,23 +913,22 @@ class StyleguideService
         )->fetchOne();
 
         if ($existingFileUid) {
-            $uidLocal = $existingFileUid;
-        } else {
-            // 2. Index the file into FAL
-            $storage = GeneralUtility::makeInstance(StorageRepository::class)->getDefaultStorage();
-            if (!$storage->getRootLevelFolder()->hasFolder('testingImages')) {
-                $storage->getRootLevelFolder()->createFolder('testingImages');
-            }
-            $fileObject = $storage->addFile($absolutePath, $storage->getRootLevelFolder()->getSubfolder('testingImages'), '', DuplicationBehavior::RENAME, false); // true = index if not indexed
-            $uidLocal = $fileObject->getUid();
-
-            // 3. Update hd_dev_styleguide field
-            $connection->update(
-                'sys_file',
-                ['hd_dev_styleguide' => $originalPath],
-                ['uid' => $uidLocal]
-            );
+            return (int)$existingFileUid;
         }
+
+        // Index the file into FAL
+        $storage = GeneralUtility::makeInstance(StorageRepository::class)->getDefaultStorage();
+        if (!$storage->getRootLevelFolder()->hasFolder('testingImages')) {
+            $storage->getRootLevelFolder()->createFolder('testingImages');
+        }
+        $fileObject = $storage->addFile($absolutePath, $storage->getRootLevelFolder()->getSubfolder('testingImages'), '', DuplicationBehavior::RENAME, false);
+        $uidLocal = (int)$fileObject->getUid();
+
+        $connection->update(
+            'sys_file',
+            ['hd_dev_styleguide' => $originalPath],
+            ['uid' => $uidLocal]
+        );
 
         return $uidLocal;
     }
@@ -859,39 +938,7 @@ class StyleguideService
 
         foreach ($dataValue as $column => $items) {
             foreach ($items as $search => $file) {
-                $originalPath = $file;
-                $absolutePath = GeneralUtility::getFileAbsFileName($originalPath);
-
-                $connection = GeneralUtility::makeInstance(ConnectionPool::class)
-                    ->getConnectionForTable('sys_file');
-
-                $existingFileUid = $connection->select(
-                    ['uid'],
-                    'sys_file',
-                    [
-                        'hd_dev_styleguide' => $originalPath, // store raw EXT: path here
-                        'missing' => 0
-                    ]
-                )->fetchOne();
-
-                if ($existingFileUid) {
-                    $uidLocal = $existingFileUid;
-                } else {
-                    // 2. Index the file into FAL
-                    $storage = GeneralUtility::makeInstance(StorageRepository::class)->getDefaultStorage();
-                    if (!$storage->getRootLevelFolder()->hasFolder('testingImages')) {
-                        $storage->getRootLevelFolder()->createFolder('testingImages');
-                    }
-                    $fileObject = $storage->addFile($absolutePath, $storage->getRootLevelFolder()->getSubfolder('testingImages'), '', DuplicationBehavior::RENAME, false); // true = index if not indexed
-                    $uidLocal = $fileObject->getUid();
-
-                    // 3. Update hd_dev_styleguide field
-                    $connection->update(
-                        'sys_file',
-                        ['hd_dev_styleguide' => $originalPath],
-                        ['uid' => $uidLocal]
-                    );
-                }
+                $uidLocal = $this->indexStyleguideFile($file);
 
                 if ($uidLocal) {
                     $replacements[$column][$search] = 't3://file?uid=' . $uidLocal;
@@ -908,45 +955,17 @@ class StyleguideService
         // fieldname => $image['fieldname']
 
         $sortingCounter = 0;
+        $wanted = [];
         foreach ($images as $image) {
             $sortingCounter++;
             $sortingForeign = $image['sorting_foreign'] ?? $sortingCounter;
 
-            // Get the file object
-            $originalPath = $image['path'];
-            $absolutePath = GeneralUtility::getFileAbsFileName($originalPath);
-
-            // 1. Check if the file already exists in sys_file.hd_dev_styleguide
-            $connection = GeneralUtility::makeInstance(ConnectionPool::class)
-                ->getConnectionForTable('sys_file');
-
-            $existingFileUid = $connection->select(
-                ['uid'],
-                'sys_file',
-                [
-                    'hd_dev_styleguide' => $originalPath, // store raw EXT: path here
-                    'missing' => 0
-                ]
-            )->fetchOne();
-
-            if ($existingFileUid) {
-                $uidLocal = $existingFileUid;
-            } else {
-                // 2. Index the file into FAL
-                $storage = GeneralUtility::makeInstance(StorageRepository::class)->getDefaultStorage();
-                if (!$storage->getRootLevelFolder()->hasFolder('testingImages')) {
-                    $storage->getRootLevelFolder()->createFolder('testingImages');
-                }
-                $fileObject = $storage->addFile($absolutePath, $storage->getRootLevelFolder()->getSubfolder('testingImages'), '', DuplicationBehavior::RENAME, false);
-                $uidLocal = $fileObject->getUid();
-
-                // 3. Update hd_dev_styleguide field
-                $connection->update(
-                    'sys_file',
-                    ['hd_dev_styleguide' => $originalPath],
-                    ['uid' => $uidLocal]
-                );
+            $uidLocal = $this->indexStyleguideFile($image['path']);
+            if (!$uidLocal) {
+                continue;
             }
+
+            $wanted[$image['tablenames'] . '.' . $image['fieldname']][] = (int)$uidLocal;
 
             $connection = GeneralUtility::makeInstance(ConnectionPool::class)
                 ->getConnectionForTable('sys_file_reference');
@@ -984,6 +1003,11 @@ class StyleguideService
                     error_log('StyleguideService: Failed to insert sys_file_reference: ' . $e->getMessage());
                 }
             }
+        }
+
+        foreach ($wanted as $key => $uidLocals) {
+            [$tablenames, $fieldname] = explode('.', $key, 2);
+            $this->pruneStaleFileReferences($uidLocals, (int)$element['uid'], $tablenames, $fieldname);
         }
     }
 
