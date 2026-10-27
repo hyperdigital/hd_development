@@ -33,6 +33,15 @@ class SyncStyleguideCommand extends Command
 
         try {
             $this->styleguideService->syncStyleguides();
+
+            // Definitions outlive the schema - a key that is no longer a column is skipped
+            // rather than fatal, and named here so it can be found and fixed.
+            $warnings = $this->styleguideService->getWarnings();
+            if ($warnings !== []) {
+                $io->warning('Some values could not be written:');
+                $io->listing($warnings);
+            }
+
             $io->success('Styleguide synchronization completed successfully.');
             return Command::SUCCESS;
         } catch (\Exception $e) {

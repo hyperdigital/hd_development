@@ -16,6 +16,13 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class StyleguideService
 {
+    /**
+     * Messages about definitions the schema no longer matches, shown by the sync command.
+     *
+     * @var array<string, string>
+     */
+    protected array $warnings = [];
+
     public function syncStyleguides()
     {
         $source = GeneralUtility::makeInstance(ExtensionConfiguration::class)
@@ -340,6 +347,8 @@ class StyleguideService
             }
         }
 
+        $values = $this->dropUnknownColumns('tt_content', $values, (string)$pageKey);
+
         $insertQueryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getQueryBuilderForTable('tt_content');
 
@@ -445,6 +454,8 @@ class StyleguideService
                 $values[$column] = str_replace($search, $replace, $values[$column]);
             }
         }
+
+        $values = $this->dropUnknownColumns('tt_content', $values, (string)$pageKey);
 
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getQueryBuilderForTable('tt_content');
@@ -1026,25 +1037,89 @@ class StyleguideService
      */
     protected function pickExistingColumns(string $table, array $data, array $already = []): array
     {
-        static $columns = [];
-
-        if (!isset($columns[$table])) {
-            $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable($table);
-            $columns[$table] = array_change_key_case(
-                $connection->createSchemaManager()->listTableColumns($table)
-            );
-        }
+        $columns = $this->columnsOf($table);
 
         $values = [];
         foreach ($data as $field => $value) {
             if ($value === null || is_array($value) || isset($already[$field])) {
                 continue;
             }
-            if (isset($columns[$table][strtolower($field)])) {
+            if (isset($columns[strtolower($field)])) {
                 $values[$field] = $value;
             }
         }
 
         return $values;
+    }
+
+    /**
+     * The columns of a table, looked up once.
+     *
+     * @return array<string, mixed> lower-cased column name => column
+     */
+    protected function columnsOf(string $table): array
+    {
+        static $columns = [];
+
+        if (!isset($columns[$table])) {
+            $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable($table);
+            $found = [];
+            foreach ($connection->createSchemaManager()->listTableColumns($table) as $column) {
+                // A column whose name is a reserved word - "recursive" on tt_content, for one -
+                // comes back quoted, so the raw array key would never match a plain field name
+                // and a perfectly good value would be dropped as unknown.
+                $found[strtolower(trim($column->getName(), '`"[]'))] = $column;
+            }
+            $columns[$table] = $found;
+        }
+
+        return $columns[$table];
+    }
+
+    /**
+     * The values whose column still exists, and a warning about each one that does not.
+     *
+     * A styleguide definition outlives the schema. 'list_type' was a column on tt_content until
+     * TYPO3 14 removed it - plugins carry their own CType now - and a definition that still sets
+     * it used to kill the whole sync with "Unknown column 'list_type' in 'field list'": no
+     * element name, no key, nothing to grep for. Dropping the key lets the rest of the sync
+     * finish, and the warning says which element to go and fix.
+     *
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    protected function dropUnknownColumns(string $table, array $values, string $elementKey): array
+    {
+        $columns = $this->columnsOf($table);
+        $kept = [];
+
+        foreach ($values as $field => $value) {
+            if (isset($columns[strtolower((string)$field)])) {
+                $kept[$field] = $value;
+                continue;
+            }
+
+            $warning = sprintf(
+                '"%s" sets %s.%s, which is not a column of that table - the value was skipped.',
+                $elementKey,
+                $table,
+                (string)$field
+            );
+            $this->warnings[$warning] = $warning;
+            error_log('StyleguideService: ' . $warning);
+        }
+
+        return $kept;
+    }
+
+    /**
+     * What the sync skipped, for the command to print. Keyed by message, so an element that
+     * repeats the same stale key is only reported once.
+     *
+     * @return list<string>
+     */
+    public function getWarnings(): array
+    {
+        return array_values($this->warnings);
     }
 }
