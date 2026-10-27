@@ -927,12 +927,26 @@ class StyleguideService
             return (int)$existingFileUid;
         }
 
-        // Index the file into FAL
+        // Index the file into FAL.
+        //
+        // addFile() runs the resource consistency check, which refuses a file whose extension is
+        // not in textfile_ext / mediafile_ext / miscfile_ext, or whose content does not match its
+        // extension. A styleguide carries sample files of every kind an element can take, so one
+        // that the installation does not allow - a .glb without the matching miscfile_ext entry,
+        // say - used to end the whole sync. It is skipped and named instead.
         $storage = GeneralUtility::makeInstance(StorageRepository::class)->getDefaultStorage();
         if (!$storage->getRootLevelFolder()->hasFolder('testingImages')) {
             $storage->getRootLevelFolder()->createFolder('testingImages');
         }
-        $fileObject = $storage->addFile($absolutePath, $storage->getRootLevelFolder()->getSubfolder('testingImages'), '', DuplicationBehavior::RENAME, false);
+        try {
+            $fileObject = $storage->addFile($absolutePath, $storage->getRootLevelFolder()->getSubfolder('testingImages'), '', DuplicationBehavior::RENAME, false);
+        } catch (\Throwable $throwable) {
+            $warning = sprintf('%s could not be indexed: %s', $originalPath, self::describe($throwable));
+            $this->warnings[$warning] = $warning;
+            error_log('StyleguideService: ' . $warning);
+
+            return false;
+        }
         $uidLocal = (int)$fileObject->getUid();
 
         $connection->update(
@@ -1110,6 +1124,30 @@ class StyleguideService
         }
 
         return $kept;
+    }
+
+    /**
+     * What actually went wrong.
+     *
+     * TYPO3's resource checks throw a ResultException whose getMessage() is the useless
+     * "Resource consistency check failed" - the reason ("File extension \"glb\" is not in the
+     * list of allowed values.") sits in its messages. Read by duck typing, because the class is
+     * marked @internal.
+     */
+    public static function describe(\Throwable $throwable): string
+    {
+        $messages = [];
+        if (property_exists($throwable, 'messages') && is_iterable($throwable->messages)) {
+            foreach ($throwable->messages as $message) {
+                if (is_object($message) && property_exists($message, 'message')) {
+                    $messages[] = (string)$message->message;
+                }
+            }
+        }
+
+        return $messages === []
+            ? $throwable->getMessage()
+            : $throwable->getMessage() . ' - ' . implode(' ', $messages);
     }
 
     /**

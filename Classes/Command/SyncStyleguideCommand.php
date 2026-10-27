@@ -44,8 +44,10 @@ class SyncStyleguideCommand extends Command
 
             $io->success('Styleguide synchronization completed successfully.');
             return Command::SUCCESS;
-        } catch (\Exception $e) {
-            $io->error('Styleguide synchronization failed: ' . $e->getMessage());
+        } catch (\Throwable $throwable) {
+            // Not getMessage(): a failed resource check says only "Resource consistency check
+            // failed" there and keeps the reason in its messages.
+            $io->error('Styleguide synchronization failed: ' . StyleguideService::describe($throwable));
             return Command::FAILURE;
         }
     }
